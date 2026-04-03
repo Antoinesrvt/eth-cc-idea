@@ -3,9 +3,21 @@
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { Toaster } from "sonner";
-import { baseSepolia } from "viem/chains";
-
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+
+// Define chain inline to avoid viem/chains import pulling process polyfill
+const baseSepolia = {
+  id: 84532,
+  name: "Base Sepolia",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://sepolia.base.org"] },
+  },
+  blockExplorers: {
+    default: { name: "BaseScan", url: "https://sepolia.basescan.org" },
+  },
+  testnet: true,
+} as const;
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const themed = (
