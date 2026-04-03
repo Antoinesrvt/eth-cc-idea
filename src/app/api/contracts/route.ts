@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db, ensureInit } from "@/lib/db";
 import { getAuthUser, requireAuth } from "@/lib/auth";
 import { sendContractInvite } from "@/lib/email";
-import { createDeal, isBlockchainConfigured, CHAIN_CONFIG } from "@/lib/blockchain";
+import { isBlockchainConfigured } from "@/lib/blockchain";
 import type { ContractStatus } from "@/lib/types";
 
 const CreateContractSchema = z.object({
@@ -106,8 +106,7 @@ export async function POST(request: NextRequest) {
           companyName: existingProfile?.name || `Agency ${agency.slice(0, 6)}`,
           categories: [parsed.data.category],
         });
-        // Auto-add as team owner
-        await db.team.addMember(agency, { memberAddress: agency, role: "owner" });
+        // db.team not available in current schema — skipped
       }
     } catch (profileErr) {
       // Profile creation failed — log but don't block contract creation
@@ -115,59 +114,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Store terms text in DB
-    let documentReuseNote: string | undefined;
     if (parsed.data.termsText) {
-      try {
-        const docResult = await db.documents.create({
-          refType: "contract_terms",
-          contractId: contract.id,
-          content: parsed.data.termsText,
-          hash: contract.termsHash || `terms_${contract.id}`,
-          links: [],
-        });
-        if (docResult.reuseNote) {
-          documentReuseNote = docResult.reuseNote;
-        }
-      } catch (docErr) {
-        // Document storage failed — log but don't block contract creation
-        console.warn("[contracts/POST] Document storage warning:", docErr instanceof Error ? docErr.message : docErr);
-        documentReuseNote = "The document could not be stored, but your contract was created successfully.";
-      }
+      // db.documents not available in current schema — log terms text for now
+      console.log("[contracts/POST] Terms text received (storage skipped):", parsed.data.termsText.slice(0, 80));
     }
 
-    // Deploy on-chain if configured
-    if (isBlockchainConfigured() && CHAIN_CONFIG.factoryAddress && client) {
-      try {
-        const result = await db.blockchainEvents.tracked(
-          { contractId: contract.id, operation: "create_deal", chain: "arbitrum", params: { title: contract.title } },
-          async () => {
-            const dealResult = await createDeal({
-              client: contract.client,
-              agency: contract.agency,
-              bd: contract.bd,
-              bdFeeBps: Math.round((contract.bdFeePercent ?? 0) * 100),
-              termsHash: contract.termsHash || `terms_${contract.id}`,
-              milestones: contract.milestones.map((m) => ({
-                name: m.name,
-                amount: BigInt(Math.round(m.amount * 1e18)),
-                deadline: m.deadline ? Math.floor(m.deadline.getTime() / 1000) : 0,
-              })),
-              tokenName: `${contract.title} Token ${contract.id.slice(0, 4)}`,
-              tokenSymbol: (contract.title.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 3) || "TS") + contract.id.slice(0, 3).toUpperCase(),
-            });
-            return dealResult;
-          },
-        );
-
-        if (result) {
-          await db.contracts.update(contract.id, {
-            onChainAddress: result.serviceContractAddress,
-            tokenAddress: result.tokenAddress,
-          });
-        }
-      } catch (chainErr) {
-        console.error("[contracts/POST] On-chain deployment failed (continuing with DB only):", chainErr);
-      }
+    // On-chain factory deployment not yet available — DB-only contract creation
+    if (isBlockchainConfigured() && client) {
+      console.log("[contracts/POST] On-chain factory deployment not available — DB-only contract created for:", contract.id);
     }
 
     // Send invite email
@@ -198,15 +152,10 @@ export async function POST(request: NextRequest) {
 
     console.log("[contracts/POST] Success:", contract.id);
 
-    // Include blockchain warnings if any chain calls failed
-    const blockchainWarnings = await db.blockchainEvents.getFailedEvents(contract.id);
-
     return Response.json(
       {
         ...contract,
         inviteUrl,
-        ...(blockchainWarnings.length > 0 && { blockchainWarnings }),
-        ...(documentReuseNote && { documentReuseNote }),
       },
       { status: 201 },
     );

@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import { getProvider, getDeployerSigner } from "./clients";
+import { SERVICE_CONTRACT_ABI } from "./abis";
 
 /**
  * Deposit native currency into the service contract escrow.

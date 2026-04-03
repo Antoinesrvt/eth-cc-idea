@@ -155,6 +155,7 @@ export async function ensureTables() {
   await safeAlter("agency_profiles", "website", "TEXT");
   await safeAlter("agency_profiles", "logo_url", "TEXT");
   await safeAlter("agency_profiles", "categories", "TEXT NOT NULL DEFAULT '[]'");
+  await safeAlter("users", "unlink_mnemonic", "TEXT");
 
   // Indexes
   await getDb().execute(sql`CREATE INDEX IF NOT EXISTS idx_milestones_contract ON milestones(contract_id)`);

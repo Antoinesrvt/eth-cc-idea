@@ -117,6 +117,21 @@ const PROCESSING_MESSAGES = [
   "Generating contract...",
 ];
 
+type GeneratedMilestone = {
+  name: string;
+  amount: number;
+  description: string;
+  deadline: string;
+};
+
+type GeneratedContract = {
+  title: string;
+  description: string;
+  category: string;
+  milestones: GeneratedMilestone[];
+  rawText?: string;
+};
+
 import { PLATFORM_FEE_PERCENT } from "@/lib/types";
 
 const slide = {
@@ -257,7 +272,7 @@ export default function NewContractPage() {
       setDescription(result.description);
       setCategories([result.category as Category]);
       setMilestones(
-        result.milestones.map((m) => ({
+        result.milestones.map((m: GeneratedMilestone) => ({
           id: crypto.randomUUID(),
           name: m.name,
           amount: m.amount,
@@ -272,8 +287,8 @@ export default function NewContractPage() {
       if (result.description) score += 20;
       if (result.category) score += 10;
       if (result.milestones?.length > 0) score += 30;
-      if (result.milestones?.every((m) => m.amount > 0)) score += 10;
-      if (result.milestones?.every((m) => m.deadline)) score += 10;
+      if (result.milestones?.every((m: GeneratedMilestone) => m.amount > 0)) score += 10;
+      if (result.milestones?.every((m: GeneratedMilestone) => m.deadline)) score += 10;
       setAiConfidence(score);
       if (result.rawText) setRawTermsText(result.rawText);
       setAiFields(new Set(["title", "description", "category", "milestones"]));

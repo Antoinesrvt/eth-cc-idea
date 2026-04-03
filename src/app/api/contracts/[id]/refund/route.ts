@@ -36,13 +36,12 @@ export async function POST(
 
         // On-chain: mark failed
         if (isBlockchainConfigured() && contract.onChainAddress) {
-          await db.blockchainEvents.tracked(
-            { contractId: id, operation: "mark_failed", chain: "arbitrum" },
-            async () => {
-              const txHash = await markContractFailed(contract.onChainAddress!);
-              return { txHash };
-            },
-          );
+          try {
+            const txHash = await markContractFailed(contract.onChainAddress);
+            console.log("[refund] On-chain markContractFailed success:", txHash);
+          } catch (err) {
+            console.warn("[refund] On-chain markContractFailed failed:", err);
+          }
         }
       } else {
         return Response.json(
@@ -57,13 +56,12 @@ export async function POST(
 
     // On-chain: refund escrow
     if (isBlockchainConfigured() && contract.onChainAddress) {
-      await db.blockchainEvents.tracked(
-        { contractId: id, operation: "refund_escrow", chain: "arbitrum" },
-        async () => {
-          const txHash = await refundEscrowOnChain(contract.onChainAddress!);
-          return { txHash };
-        },
-      );
+      try {
+        const txHash = await refundEscrowOnChain(contract.onChainAddress);
+        console.log("[refund] On-chain refundEscrow success:", txHash);
+      } catch (err) {
+        console.warn("[refund] On-chain refundEscrow failed:", err);
+      }
     }
 
     const updated = await db.contracts.findById(id);

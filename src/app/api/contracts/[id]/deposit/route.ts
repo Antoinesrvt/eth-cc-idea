@@ -5,6 +5,10 @@ import { requireRole } from "@/lib/auth";
 import { validateDeposit, createDepositRecord } from "@/lib/payments/escrow";
 import { depositEscrow, isBlockchainConfigured } from "@/lib/blockchain";
 import { notifyUser } from "@/lib/email";
+import { privateDeposit, isUnlinkConfigured } from "@/lib/privacy";
+
+// USDC on Base Sepolia
+const PAYMENT_TOKEN = process.env.PAYMENT_TOKEN_ADDRESS || "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 const DepositSchema = z.object({
   amount: z.number().positive(),
@@ -74,13 +78,26 @@ export async function POST(
     if (isBlockchainConfigured()) {
       const contract = await db.contracts.findById(id);
       if (contract?.onChainAddress) {
-        await db.blockchainEvents.tracked(
-          { contractId: id, operation: "deposit", chain: "arbitrum", params: { amount: parsed.data.amount } },
-          async () => {
-            const txHash = await depositEscrow(contract.onChainAddress!, BigInt(Math.round(parsed.data.amount * 1e18)));
-            return { txHash };
-          },
-        );
+        try {
+          const txHash = await depositEscrow(contract.onChainAddress, BigInt(Math.round(parsed.data.amount * 1e18)));
+          console.log("[deposit] On-chain depositEscrow success:", txHash);
+        } catch (err) {
+          console.warn("[deposit] On-chain depositEscrow failed:", err);
+        }
+      }
+    }
+
+    // Attempt private deposit into Unlink shielded pool (server-side ZKP)
+    if (isUnlinkConfigured()) {
+      try {
+        const rawUser = await db.users.findRawByAddress(auth.walletAddress);
+        if (rawUser?.unlinkMnemonic) {
+          const amountWei = BigInt(Math.round(parsed.data.amount * 1e6)); // USDC has 6 decimals
+          await privateDeposit(rawUser.unlinkMnemonic, PAYMENT_TOKEN, amountWei.toString());
+        }
+      } catch (unlinkError) {
+        // Unlink failure must not block the DB operation — log and continue
+        console.error("[Unlink] privateDeposit failed:", unlinkError);
       }
     }
 

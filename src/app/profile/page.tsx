@@ -20,6 +20,7 @@ import {
   FileClock,
 } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
+import { useApi } from "@/hooks/use-api";
 import {
   PageHeader,
   SectionCard,
@@ -461,6 +462,14 @@ export default function ProfilePage() {
     uploadDocument,
     walletAddress,
   } = useProfile();
+
+  // Fetch contracts for stats
+  const contractsUrl = walletAddress
+    ? `/api/contracts?user=${encodeURIComponent(walletAddress)}`
+    : null;
+  const { data: rawContracts, loading } = useApi<Array<{ id: string; title: string; status: string; totalValue: number; createdAt: string }>>(contractsUrl);
+  const apiContracts = rawContracts ?? [];
+
   const [editing, setEditing] = useState(false);
 
   // Wallet balance — query chain RPC

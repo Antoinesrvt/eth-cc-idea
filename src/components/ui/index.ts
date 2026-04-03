@@ -7,3 +7,4 @@ export { PageHeader } from "./page-header";
 export { FormField } from "./form-field";
 export { EmptyState } from "./empty-state";
 export { AgencySetupSection } from "./agency-setup-section";
+export { EvidenceTag } from "./evidence-tag";

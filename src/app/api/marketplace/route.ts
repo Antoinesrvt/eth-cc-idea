@@ -1,4 +1,8 @@
+import { ethers } from "ethers";
 import { db, ensureInit } from "@/lib/db";
+import { CHAIN_CONFIG } from "@/lib/blockchain/config";
+import { getProvider } from "@/lib/blockchain/clients";
+import { getPoolAddress, getPoolInfo } from "@/lib/uniswap";
 
 // Auth: public (demo) — add requireAuth() for production
 export async function GET() {
@@ -25,6 +29,29 @@ export async function GET() {
 
         const agencyProfile = await db.users.findByAddress(contract.agency);
 
+        // Fetch Uniswap V3 pool info (best-effort, non-blocking)
+        let hasPool = false;
+        let poolLiquidity: string | null = null;
+        if (contract.tokenAddress && CHAIN_CONFIG.paymentTokenAddress) {
+          try {
+            const provider = getProvider();
+            const poolAddress = await getPoolAddress(
+              contract.tokenAddress,
+              CHAIN_CONFIG.paymentTokenAddress,
+              provider,
+            );
+            if (poolAddress && poolAddress !== ethers.ZeroAddress) {
+              const info = await getPoolInfo(poolAddress, provider);
+              if (info) {
+                hasPool = true;
+                poolLiquidity = info.liquidity.toString();
+              }
+            }
+          } catch {
+            // Pool may not exist yet
+          }
+        }
+
         return {
           tokenId: contract.id,
           tokenAddress: contract.tokenAddress,
@@ -36,6 +63,9 @@ export async function GET() {
           completedMilestones,
           totalMilestones,
           avgScore: completionScore,
+          // Uniswap pool availability
+          hasPool,
+          poolLiquidity,
           agency: {
             address: contract.agency,
             name: agencyProfile?.name ?? null,

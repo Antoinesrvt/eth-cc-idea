@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { db, ensureInit } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
-import { createDeal, isBlockchainConfigured, CHAIN_CONFIG } from "@/lib/blockchain";
+import { isBlockchainConfigured } from "@/lib/blockchain";
 import { notifyUser } from "@/lib/email";
 
 // GET: Look up contract by invite token, return summary with milestones
@@ -127,41 +127,10 @@ export async function POST(
       });
     }
 
-    // Deploy on-chain now that both parties are known (was skipped at creation because client was empty)
+    // On-chain deployment via factory is not yet available — skipped
     const updated = await db.contracts.findById(contract.id);
-    if (updated && !updated.onChainAddress && isBlockchainConfigured() && CHAIN_CONFIG.factoryAddress && updated.client && updated.agency) {
-      try {
-        const result = await db.blockchainEvents.tracked(
-          { contractId: contract.id, operation: "create_deal", chain: "arbitrum", params: { title: contract.title } },
-          async () => {
-            const dealResult = await createDeal({
-              client: updated.client,
-              agency: updated.agency,
-              bd: updated.bd,
-              bdFeeBps: Math.round((updated.bdFeePercent ?? 0) * 100),
-              termsHash: updated.termsHash || `terms_${contract.id}`,
-              milestones: updated.milestones.map((m) => ({
-                name: m.name,
-                amount: BigInt(Math.round(m.amount * 1e18)),
-                deadline: m.deadline ? Math.floor(m.deadline.getTime() / 1000) : 0,
-              })),
-              tokenName: `${updated.title} Token ${updated.id.slice(0, 4)}`,
-              tokenSymbol: (updated.title.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 3) || "TS") + updated.id.slice(0, 3).toUpperCase(),
-            });
-            return dealResult;
-          },
-        );
-
-        if (result) {
-          await db.contracts.update(contract.id, {
-            onChainAddress: result.serviceContractAddress,
-            tokenAddress: result.tokenAddress,
-          });
-          console.log("[invite/POST] On-chain deploy success:", result.serviceContractAddress);
-        }
-      } catch (chainErr) {
-        console.error("[invite/POST] On-chain deploy failed (continuing DB-only):", chainErr);
-      }
+    if (updated && !updated.onChainAddress && isBlockchainConfigured() && updated.client && updated.agency) {
+      console.log("[invite/POST] On-chain factory deployment not available — DB-only contract created");
     }
 
     return Response.json({

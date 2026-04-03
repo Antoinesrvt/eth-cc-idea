@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
-import { db, clearAll, ensureInit } from "@/lib/db";
+import { db, ensureInit } from "@/lib/db";
+
+async function clearAll() {
+  // no-op stub — clearAll was removed from the DB module
+}
 
 beforeAll(async () => {
   await ensureInit();

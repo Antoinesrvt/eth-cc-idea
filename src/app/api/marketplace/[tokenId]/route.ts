@@ -1,9 +1,11 @@
+import { ethers } from "ethers";
 import { type NextRequest } from "next/server";
 import { db, ensureInit } from "@/lib/db";
 import type { TokenizationExposure } from "@/lib/types/contract";
 import { DEFAULT_EXPOSURE } from "@/lib/types/contract";
-import { getDb } from "@/lib/db/client";
-import { eq } from "drizzle-orm";
+import { CHAIN_CONFIG } from "@/lib/blockchain/config";
+import { getProvider } from "@/lib/blockchain/clients";
+import { getPoolAddress, getPoolInfo } from "@/lib/uniswap";
 
 // Public endpoint — marketplace listing detail
 export async function GET(
@@ -27,11 +29,38 @@ export async function GET(
 
     const agencyProfile = await db.users.findByAddress(contract.agency);
 
-    // Fetch listing metadata (token name, symbol, supply, price)
-    const listing = contract.tokenAddress
-      ? (await getDb()
-          .select()
-      : null;
+    // Fetch Uniswap V3 pool info for this token (best-effort)
+    let poolInfo: {
+      poolAddress: string;
+      sqrtPriceX96: string;
+      tick: number;
+      liquidity: string;
+    } | null = null;
+
+    if (contract.tokenAddress && CHAIN_CONFIG.paymentTokenAddress) {
+      try {
+        const provider = getProvider();
+        const poolAddress = await getPoolAddress(
+          contract.tokenAddress,
+          CHAIN_CONFIG.paymentTokenAddress,
+          provider,
+        );
+        if (poolAddress && poolAddress !== ethers.ZeroAddress) {
+          const info = await getPoolInfo(poolAddress, provider);
+          if (info) {
+            poolInfo = {
+              poolAddress,
+              // Serialize bigints to strings for JSON
+              sqrtPriceX96: info.sqrtPriceX96.toString(),
+              tick: info.tick,
+              liquidity: info.liquidity.toString(),
+            };
+          }
+        }
+      } catch {
+        // Pool may not exist yet — best-effort
+      }
+    }
 
     const completedMilestones = contract.milestones.filter(
       (m) => m.status === "approved",
@@ -47,9 +76,9 @@ export async function GET(
       ? (JSON.parse(contract.tokenizationExposure as string) as TokenizationExposure)
       : DEFAULT_EXPOSURE;
 
-    // Hackathon price model: 100 tokens per contract, price = totalValue / 100
-    const totalSupply = listing?.totalSupply ?? 100;
-    const pricePerToken = listing?.price ?? contract.totalValue / 100;
+    // Price model: 100 tokens per contract, price = totalValue / 100
+    const totalSupply = 100;
+    const pricePerToken = contract.totalValue / 100;
 
     return Response.json({
       id: contract.id,
@@ -61,10 +90,12 @@ export async function GET(
       onChainAddress: contract.onChainAddress,
       createdAt: contract.createdAt,
       updatedAt: contract.updatedAt,
-      tokenName: listing?.tokenName ?? contract.title,
-      tokenSymbol: listing?.tokenSymbol ?? "IDT",
+      tokenName: contract.title,
+      tokenSymbol: "IDT",
       totalSupply,
       pricePerToken,
+      // Uniswap V3 pool data (null if pool not yet created)
+      pool: poolInfo,
       exposure: {
         showDescription: exposure.showDescription,
         showMilestones: exposure.showMilestones,

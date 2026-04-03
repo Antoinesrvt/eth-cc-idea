@@ -59,17 +59,16 @@ export async function POST(
 
     // Attempt on-chain rejection if blockchain is configured
     if (isBlockchainConfigured() && contract.onChainAddress) {
-      await db.blockchainEvents.tracked(
-        { contractId: id, operation: "reject", chain: "arbitrum", params: { milestoneId: parsed.data.milestoneId } },
-        async () => {
-          const txHash = await rejectMilestone(
-            contract.onChainAddress!,
-            parsed.data.milestoneId,
-            parsed.data.reason || "Rejected",
-          );
-          return { txHash };
-        },
-      );
+      try {
+        const txHash = await rejectMilestone(
+          contract.onChainAddress,
+          parsed.data.milestoneId,
+          parsed.data.reason || "Rejected",
+        );
+        console.log("[reject] On-chain rejectMilestone success:", txHash);
+      } catch (err) {
+        console.warn("[reject] On-chain rejectMilestone failed:", err);
+      }
     }
 
     // Notify agency that milestone was rejected

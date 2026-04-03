@@ -83,9 +83,8 @@ export async function GET(
 
     const escrow = await db.escrows.findByContract(id);
     const disputes = await db.disputes.findByContract(id);
-    const blockchainEvents = await db.blockchainEvents.findByContract(id);
 
-    return Response.json({ ...contract, escrow, disputes, blockchainEvents });
+    return Response.json({ ...contract, escrow, disputes });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Internal error" },

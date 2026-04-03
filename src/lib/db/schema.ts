@@ -54,6 +54,35 @@ export const milestones = pgTable("milestones", {
 // ---------------------------------------------------------------------------
 // Users
 // ---------------------------------------------------------------------------
+
+export const users = pgTable("users", {
+  address: text("address").primaryKey(),
+  name: text("name"),
+  email: text("email"),
+  roles: text("roles").notNull(),
+  createdAt: text("created_at").notNull(),
+  unlinkMnemonic: text("unlink_mnemonic"),
+});
+
+export const agencyProfiles = pgTable("agency_profiles", {
+  address: text("address").primaryKey().references(() => users.address, { onDelete: "cascade" }),
+  score: real("score").notNull().default(0),
+  contractsCompleted: integer("contracts_completed").notNull().default(0),
+  contractsFailed: integer("contracts_failed").notNull().default(0),
+  disputesWon: integer("disputes_won").notNull().default(0),
+  disputesLost: integer("disputes_lost").notNull().default(0),
+  totalVolume: real("total_volume").notNull().default(0),
+  avgAiScore: real("avg_ai_score").notNull().default(0),
+  verified: boolean("verified").notNull().default(false),
+  attestations: text("attestations").notNull().default("[]"),
+  companyName: text("company_name"),
+  description: text("description"),
+  website: text("website"),
+  logoUrl: text("logo_url"),
+  categories: text("categories").notNull().default("[]"),
+});
+
+// ---------------------------------------------------------------------------
 // Disputes
 // ---------------------------------------------------------------------------
 

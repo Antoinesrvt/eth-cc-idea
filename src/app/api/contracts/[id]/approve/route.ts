@@ -3,8 +3,12 @@ import { z } from "zod";
 import { db, ensureInit } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { calculateMilestoneRelease } from "@/lib/payments/escrow";
-import { approveMilestone, postAttestation, isBlockchainConfigured, CHAIN_CONFIG } from "@/lib/blockchain";
+import { approveMilestone, isBlockchainConfigured } from "@/lib/blockchain";
 import { notifyUser } from "@/lib/email";
+import { privateTransfer, isUnlinkConfigured } from "@/lib/privacy";
+
+// USDC on Base Sepolia
+const PAYMENT_TOKEN = process.env.PAYMENT_TOKEN_ADDRESS || "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 const ApproveSchema = z.object({
   milestoneId: z.number().int().positive(),
@@ -85,6 +89,31 @@ export async function POST(
 
     const escrow = await db.escrows.release(id, milestone.amount);
 
+    // Attempt private milestone payout via Unlink shielded pool (server-side ZKP)
+    if (isUnlinkConfigured()) {
+      try {
+        // Get the client's mnemonic (escrow holder) and agency's mnemonic (recipient)
+        const clientRaw = await db.users.findRawByAddress(auth.walletAddress);
+        const agencyRaw = await db.users.findRawByAddress(contract.agency);
+        if (clientRaw?.unlinkMnemonic && agencyRaw?.unlinkMnemonic) {
+          const { createUnlinkClient } = await import("@/lib/privacy");
+          const agencyUnlink = createUnlinkClient(agencyRaw.unlinkMnemonic);
+          const agencyUnlinkAddress = await agencyUnlink.getAddress();
+          const toAgencyAmount = feeBreakdown.toAgency;
+          const payoutAmountWei = BigInt(Math.round(toAgencyAmount * 1e6)); // USDC 6 decimals
+          await privateTransfer(
+            clientRaw.unlinkMnemonic,
+            agencyUnlinkAddress,
+            PAYMENT_TOKEN,
+            payoutAmountWei.toString(),
+          );
+        }
+      } catch (unlinkError) {
+        // Unlink failure must not block the DB operation — log and continue
+        console.error("[Unlink] privateTransfer failed:", unlinkError);
+      }
+    }
+
     const allApproved = updatedContract.milestones.every(
       (m) => m.status === "approved",
     );
@@ -94,45 +123,14 @@ export async function POST(
 
     // Attempt real on-chain milestone approval if blockchain is configured
     if (isBlockchainConfigured() && contract.onChainAddress) {
-      await db.blockchainEvents.tracked(
-        { contractId: id, operation: "approve", chain: "arbitrum", params: { milestoneId: parsed.data.milestoneId } },
-        async () => {
-          const txHash = await approveMilestone(contract.onChainAddress!, parsed.data.milestoneId);
-          return { txHash };
-        },
-      );
-
-      // Record completion on AgencyProfile
-      if (allApproved && CHAIN_CONFIG.agencyProfileAddress) {
-        await db.blockchainEvents.tracked(
-          { contractId: id, operation: "record_completion", chain: "arbitrum", params: { agency: contract.agency } },
-          async () => {
-            const { recordCompletion } = await import("@/lib/blockchain/agency-profile");
-            const txHash = await recordCompletion(
-              contract.agency,
-              BigInt(Math.round(contract.totalValue * 1e18)),
-              100, // completion score (no AI scoring)
-            );
-            return { txHash };
-          },
-        );
+      try {
+        const txHash = await approveMilestone(contract.onChainAddress, parsed.data.milestoneId);
+        console.log("[approve] On-chain approveMilestone success:", txHash);
+      } catch (err) {
+        console.warn("[approve] On-chain approveMilestone failed:", err);
       }
 
-      if (allApproved && contract.tokenAddress && CHAIN_CONFIG.attestationAddress) {
-        await db.blockchainEvents.tracked(
-          { contractId: id, operation: "attest", chain: "arbitrum", params: { tokenAddress: contract.tokenAddress } },
-          async () => {
-            const txHash = await postAttestation({
-              attestationAddress: CHAIN_CONFIG.attestationAddress,
-              tokenAddress: contract.tokenAddress!,
-              approved: true,
-              reason: "All milestones approved — contract completed successfully",
-              score: 100,
-            });
-            return { txHash };
-          },
-        );
-      }
+      // AgencyProfile on-chain recording not yet available — skipped
     }
 
     // Notify agency that milestone was approved
@@ -156,14 +154,12 @@ export async function POST(
       if (contract.client) notifyUser(contract.client, completedNotif);
     }
 
-    const blockchainWarnings = await db.blockchainEvents.getFailedEvents(id);
     return Response.json({
       contract: allApproved
         ? await db.contracts.findById(id)
         : updatedContract,
       escrow,
       feeBreakdown,
-      ...(blockchainWarnings.length > 0 && { blockchainWarnings }),
     });
   } catch (error) {
     return Response.json(

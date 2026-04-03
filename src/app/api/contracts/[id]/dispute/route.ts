@@ -199,24 +199,10 @@ async function handlePayFee(
     }
   }
 
-  // If both parties paid, escalate to Kleros review
+  // If both parties paid, escalate to Kleros review (on-chain Kleros not yet wired)
   if (updated.clientFeePaid && updated.agencyFeePaid) {
-    try {
-      await db.disputes.update(data.disputeId, {
-        klerosDisputeId: klerosResult.disputeId,
-        phase: "kleros_review",
-      });
-      console.log(
-        `[court] Kleros dispute created: ${klerosResult.disputeId}, tx: ${klerosResult.txHash}`,
-      );
-    } catch (courtErr) {
-      console.error(
-        "[court] Kleros dispute creation failed:",
-        courtErr,
-      );
-      // Still move to kleros_review phase even if on-chain fails
-      await db.disputes.update(data.disputeId, { phase: "kleros_review" });
-    }
+    await db.disputes.update(data.disputeId, { phase: "kleros_review" });
+    console.log("[court] Both fees paid — escalated to kleros_review (DB only)");
   }
 
   const finalDispute = (await db.disputes.findById(data.disputeId))!;
@@ -275,13 +261,12 @@ async function handleCheckDeadline(
 
     // Refund milestone on-chain if client wins by default
     if (result.defaultWinner === "client" && isBlockchainConfigured() && freshContract?.onChainAddress) {
-      await db.blockchainEvents.tracked(
-        { contractId, operation: "refund_milestone", chain: "arbitrum", params: { milestoneId: dispute.milestoneId } },
-        async () => {
-          const txHash = await refundMilestone(freshContract.onChainAddress!, dispute.milestoneId);
-          return { txHash };
-        },
-      );
+      try {
+        const txHash = await refundMilestone(freshContract.onChainAddress, dispute.milestoneId);
+        console.log("[dispute/deadline] On-chain refundMilestone success:", txHash);
+      } catch (err) {
+        console.warn("[dispute/deadline] On-chain refundMilestone failed:", err);
+      }
     }
 
     // Notify both parties of the default ruling

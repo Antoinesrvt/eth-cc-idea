@@ -2,6 +2,8 @@ import type { UserProfile, UserRole, AgencyProfile } from "@/lib/types";
 import { getDb } from "./client";
 import { users as usersTable, agencyProfiles as agencyProfilesTable } from "./schema";
 import { eq, sql } from "drizzle-orm";
+import { generateMnemonic } from "viem/accounts";
+import { english } from "viem/accounts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,6 +69,7 @@ export async function createUser(data: {
   roles: UserRole[];
 }): Promise<UserProfile> {
   const now = new Date().toISOString();
+  const mnemonic = generateMnemonic(english);
 
   await getDb().insert(usersTable).values({
     address: data.address,
@@ -74,6 +77,7 @@ export async function createUser(data: {
     email: data.email ?? null,
     roles: JSON.stringify(data.roles),
     createdAt: now,
+    unlinkMnemonic: mnemonic,
   });
 
   return (await loadUser(data.address))!;
@@ -81,6 +85,17 @@ export async function createUser(data: {
 
 export async function findByAddress(address: string): Promise<UserProfile | null> {
   return loadUser(address);
+}
+
+/** Server-side only: returns raw DB row including sensitive fields like unlinkMnemonic */
+export async function findRawByAddress(
+  address: string,
+): Promise<typeof usersTable.$inferSelect | null> {
+  const rows = await getDb()
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.address, address));
+  return rows[0] ?? null;
 }
 
 /** List all users who have the "agency" role */

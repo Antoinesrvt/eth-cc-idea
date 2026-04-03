@@ -78,6 +78,20 @@ interface ActionItem {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
+interface DashboardContract {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  client: string;
+  agency: string;
+  status: string;
+  totalValue: number;
+  milestones: { id: number; name: string; status: string; amount: number }[];
+  tokenAddress?: string;
+}
+
+function computeProgress(c: DashboardContract): number {
   if (!c.milestones || c.milestones.length === 0) return 0;
   const approved = c.milestones.filter((m) => m.status === "approved").length;
   return Math.round((approved / c.milestones.length) * 100);
@@ -232,56 +246,33 @@ export default function DashboardPage() {
     ? `/api/contracts?user=${encodeURIComponent(walletAddress)}`
     : null;
   const { data: allContracts, loading: contractsLoading } =
+    useApi<DashboardContract[]>(contractsUrl);
 
   /* Fetch marketplace listings so we can match investor holdings */
   const { data: marketplaceListings } = useApi<MarketplaceListing[]>(
     walletAddress ? "/api/marketplace" : null,
   );
 
-  /* Fetch investor holdings for this wallet */
-  const { data: holdings } = useApi<InvestorHolding[]>(
-    walletAddress
-      ? `/api/users/${encodeURIComponent(walletAddress)}/holdings`
-      : null,
-  );
-
   /* ---- Derive role-based contract groups ---- */
+  const agencyContracts = useMemo<DashboardContract[]>(() => {
     if (!allContracts || !walletAddress) return [];
     return allContracts.filter(
       (c) => c.agency?.toLowerCase() === walletAddress.toLowerCase(),
     );
   }, [allContracts, walletAddress]);
 
+  const clientContracts = useMemo<DashboardContract[]>(() => {
     if (!allContracts || !walletAddress) return [];
     return allContracts.filter(
       (c) => c.client?.toLowerCase() === walletAddress.toLowerCase(),
     );
   }, [allContracts, walletAddress]);
 
-  /* ---- Investments: holdings mapped to marketplace listings ---- */
+  /* ---- Investments: not yet available (holdings DB not wired) ---- */
   const investments = useMemo<InvestmentRow[]>(() => {
-    if (!holdings || !marketplaceListings) return [];
-    return (holdings as unknown as InvestorHolding[])
-      .map((h) => {
-        const listing = marketplaceListings.find(
-          (l) => l.tokenId === h.contractId,
-        );
-        if (!listing) return null;
-        return {
-          contractId: h.contractId,
-          tokenAddress: h.tokenAddress,
-          title: listing.title,
-          agencyName: listing.agency.name,
-          agencyAddress: listing.agency.address,
-          amount: h.amount,
-          buyPrice: h.buyPrice,
-          currentPrice: h.currentPrice,
-          status: listing.status,
-          progress: listing.progress,
-        } satisfies InvestmentRow;
-      })
-      .filter((x): x is InvestmentRow => x !== null);
-  }, [holdings, marketplaceListings]);
+    // Holdings DB not available yet — Uniswap integration coming soon
+    return [];
+  }, []);
 
   /* ---- Quick stats (across all roles) ---- */
   const allMyContracts = useMemo(
@@ -580,7 +571,7 @@ export default function DashboardPage() {
                   title={c.title}
                   counterpartyLabel="Client"
                   counterparty={null}
-                  progress={contractProgress(c)}
+                  progress={computeProgress(c)}
                   status={c.status}
                 />
               ))}
@@ -624,7 +615,7 @@ export default function DashboardPage() {
                   counterparty={
                     c.agency ? truncateAddress(c.agency) : null
                   }
-                  progress={contractProgress(c)}
+                  progress={computeProgress(c)}
                   status={c.status}
                 />
               ))}
