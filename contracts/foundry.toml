@@ -9,4 +9,4 @@ evm_version = "paris"
 via_ir = true
 
 [rpc_endpoints]
-privacy_ledger = "${PRIVACY_NODE_RPC_URL}"
+base_sepolia = "https://sepolia.base.org"

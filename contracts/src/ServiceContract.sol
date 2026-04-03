@@ -182,7 +182,7 @@ contract ServiceContract is ReentrancyGuard {
             termsHash: _termsHash,
             totalValue: total,
             status: ContractStatus.Draft,
-            createdAt: block.timestamp,
+            createdAt: block.timestamp
         });
 
         require(_paymentToken != address(0), "Invalid payment token");
@@ -392,24 +392,6 @@ contract ServiceContract is ReentrancyGuard {
         emit DeliverableSubmitted(milestoneId, proofHash);
     }
 
-
-
-    /// @param milestoneId  Index of the milestone
-    /// @param verdictHash  IPFS hash of the full AI verdict JSON
-    /// @param decision     0=insufficient_data, 1=approved, 2=rejected
-    /// @param score        AI confidence score 0-100
-        uint256 milestoneId,
-        bytes32 verdictHash,
-        uint8 decision,
-        uint8 score
-    ) external {
-        if (milestoneId >= _milestones.length) revert InvalidMilestone();
-        if (score > 100) revert InvalidScore();
-
-        Milestone storage m = _milestones[milestoneId];
-
-        emit AiVerdictRecorded(milestoneId, verdictHash, decision, score);
-    }
 
 
     // ── View Functions ───────────────────────────────────────────────────
