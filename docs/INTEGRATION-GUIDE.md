@@ -110,21 +110,27 @@ pnpm add @uniswap/v3-sdk @uniswap/sdk-core
 
 ---
 
-## Chain Decision: Base Sepolia vs Arbitrum Sepolia
+## Chain Decision: RESOLVED → Base Sepolia
 
-| Feature | Base Sepolia | Arbitrum Sepolia |
-|---|---|---|
-| Unlink | ✅ Supported | ❌ Not confirmed |
-| Uniswap V3 | ❓ Need to check | ✅ Deployed |
-| Kleros | ❌ Not on Base | ✅ Native |
-| USDC | ✅ Available | ✅ Available |
+All 3 prize tracks work on **Base Sepolia**:
 
-**Options:**
-1. **Base Sepolia** — Unlink works, need to check Uniswap, no Kleros
-2. **Arbitrum Sepolia** — Uniswap + Kleros work, no Unlink
-3. **Both** — Unlink on Base, Uniswap on Arbitrum (adds bridge complexity)
+| Feature | Base Sepolia |
+|---|---|
+| Unlink (ZKP) | ✅ Their only testnet |
+| Uniswap V3 | ✅ Factory, Router, NFT Position Manager deployed |
+| USDC | ✅ Available |
+| Kleros | ❌ Not on Base (skip for hackathon, add via bridge later) |
 
-**Action needed:** Check with Unlink team if they support Arbitrum Sepolia. If yes → Arbitrum for everything. If no → evaluate tradeoffs.
+**Key addresses:**
+```
+Uniswap Factory:     0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
+Uniswap Router:      0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4
+Uniswap NFT Pos:     0x27F971cb582BF9E50F397e4d29a5C7A34f11faA2
+WETH:                0x4200000000000000000000000000000000000006
+Unlink Engine:       https://staging-api.unlink.xyz
+```
+
+**Disputes:** Human evidence + platform ruling (no Kleros). Can add Kleros post-hackathon via Hyperlane bridge to Arbitrum.
 
 ---
 

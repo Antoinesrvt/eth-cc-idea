@@ -3,7 +3,7 @@
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { Toaster } from "sonner";
-import { arbitrumSepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
@@ -43,8 +43,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           primary: ["google", "telegram", "detected_ethereum_wallets"],
           overflow: ["email"],
         },
-        defaultChain: arbitrumSepolia,
-        supportedChains: [arbitrumSepolia],
+        defaultChain: baseSepolia,
+        supportedChains: [baseSepolia],
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
         },
