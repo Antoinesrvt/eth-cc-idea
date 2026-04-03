@@ -1,0 +1,213 @@
+/*
+ * IDT Theme — Intellectual Deliverable Tokenization
+ *
+ * Identity: Trust, growth, money. Green-forward fintech aesthetic.
+ * Accent: Sea Green #2E8B57 (primary actions, CTAs)
+ * Brand: Deep forest green (logo, blockchain identity)
+ * Success: Bright emerald (approval, completion)
+ * Warning: Warm amber (pending, caution)
+ * Danger: Coral red (disputes, failures)
+ * Info: Teal (neutral informational)
+ *
+ * All colors use OKLCH for perceptual uniformity.
+ */
+
+@layer base {
+  /* ================================================================
+     LIGHT THEME
+     Clean, professional. White surfaces with green accents.
+     ================================================================ */
+  :root,
+  .light,
+  [data-theme="light"] {
+    color-scheme: light;
+
+    /* Primitives (shared) */
+    --white: oklch(100% 0 0);
+    --black: oklch(0% 0 0);
+
+    /* Brand — Deep forest green */
+    --brand: oklch(0.42 0.12 160);
+    --brand-foreground: oklch(0.98 0 0);
+    --brand-muted: oklch(0.42 0.12 160 / 0.1);
+
+    /* Base — faint green-tinted white */
+    --background: oklch(0.975 0.003 155);
+    --foreground: oklch(0.18 0.015 160);
+
+    /* Surfaces — layered depth with green undertone */
+    --surface: var(--white);
+    --surface-foreground: var(--foreground);
+    --surface-secondary: oklch(0.96 0.005 155);
+    --surface-secondary-foreground: var(--foreground);
+    --surface-tertiary: oklch(0.94 0.007 155);
+    --surface-tertiary-foreground: var(--foreground);
+
+    /* Overlay */
+    --overlay: var(--white);
+    --overlay-foreground: var(--foreground);
+
+    /* Muted text */
+    --muted: oklch(0.55 0.012 160);
+
+    /* Accent — Sea Green #2E8B57 */
+    --accent: oklch(0.55 0.14 160);
+    --accent-foreground: var(--white);
+
+    /* Default (neutral) */
+    --default: oklch(0.94 0.004 155);
+    --default-foreground: var(--foreground);
+
+    /* Status: Success — Bright emerald */
+    --success: oklch(0.68 0.18 148);
+    --success-foreground: var(--white);
+
+    /* Status: Warning — Warm amber */
+    --warning: oklch(0.78 0.16 75);
+    --warning-foreground: oklch(0.25 0.04 60);
+
+    /* Status: Danger — Coral red */
+    --danger: oklch(0.60 0.22 25);
+    --danger-foreground: var(--white);
+
+    /* Info — Teal */
+    --info: oklch(0.60 0.12 195);
+    --info-foreground: var(--white);
+
+    /* Form Fields */
+    --field-background: var(--white);
+    --field-foreground: var(--foreground);
+    --field-placeholder: var(--muted);
+    --field-border: oklch(0.88 0.008 155);
+
+    /* Borders & Separators */
+    --border: oklch(0.90 0.006 155);
+    --separator: oklch(0.92 0.004 155);
+
+    /* Focus ring */
+    --focus: var(--accent);
+
+    /* Link */
+    --link: var(--accent);
+
+    /* Radius */
+    --radius: 0.625rem;
+    --field-radius: 0.75rem;
+
+    /* Shadows */
+    --surface-shadow:
+      0 1px 3px 0 oklch(0.25 0.015 160 / 0.06),
+      0 1px 2px 0 oklch(0.25 0.015 160 / 0.04);
+    --overlay-shadow:
+      0 4px 16px 0 oklch(0.25 0.015 160 / 0.08),
+      0 2px 8px 0 oklch(0.25 0.015 160 / 0.06);
+    --field-shadow:
+      0 1px 2px 0 oklch(0.25 0.015 160 / 0.04);
+
+    /* Scrollbar */
+    --scrollbar: oklch(0.85 0.008 155);
+
+    /* Skeleton */
+    --skeleton-animation: shimmer;
+  }
+
+  /* ================================================================
+     DARK THEME
+     Deep green-black with luminous green accents.
+     ================================================================ */
+  .dark,
+  [data-theme="dark"] {
+    color-scheme: dark;
+
+    /* Brand — Brighter forest green for dark bg */
+    --brand: oklch(0.55 0.14 160);
+    --brand-foreground: oklch(0.98 0 0);
+    --brand-muted: oklch(0.55 0.14 160 / 0.15);
+
+    /* Base — Deep green-black */
+    --background: oklch(0.13 0.012 160);
+    --foreground: oklch(0.94 0.005 155);
+
+    /* Surfaces — layered darkness with green tint */
+    --surface: oklch(0.18 0.015 160);
+    --surface-foreground: var(--foreground);
+    --surface-secondary: oklch(0.22 0.013 160);
+    --surface-secondary-foreground: var(--foreground);
+    --surface-tertiary: oklch(0.26 0.011 160);
+    --surface-tertiary-foreground: var(--foreground);
+
+    /* Overlay */
+    --overlay: oklch(0.20 0.015 160);
+    --overlay-foreground: var(--foreground);
+
+    /* Muted text */
+    --muted: oklch(0.62 0.012 155);
+
+    /* Accent — Brighter sea green for dark */
+    --accent: oklch(0.62 0.15 160);
+    --accent-foreground: oklch(0.12 0.015 160);
+
+    /* Default (neutral) */
+    --default: oklch(0.26 0.010 160);
+    --default-foreground: var(--foreground);
+
+    /* Status: Success — Bright emerald */
+    --success: oklch(0.74 0.18 148);
+    --success-foreground: oklch(0.15 0.04 148);
+
+    /* Status: Warning — Lighter amber */
+    --warning: oklch(0.82 0.14 75);
+    --warning-foreground: oklch(0.20 0.04 60);
+
+    /* Status: Danger — Lighter coral */
+    --danger: oklch(0.65 0.20 25);
+    --danger-foreground: oklch(0.98 0 0);
+
+    /* Info — Lighter teal */
+    --info: oklch(0.66 0.10 195);
+    --info-foreground: oklch(0.12 0.02 195);
+
+    /* Form Fields */
+    --field-background: oklch(0.20 0.015 160);
+    --field-foreground: var(--foreground);
+    --field-placeholder: oklch(0.50 0.012 155);
+    --field-border: oklch(0.30 0.012 160);
+
+    /* Borders & Separators */
+    --border: oklch(0.28 0.010 160);
+    --separator: oklch(0.24 0.008 160);
+
+    /* Focus ring */
+    --focus: var(--accent);
+
+    /* Link */
+    --link: var(--accent);
+
+    /* Shadows */
+    --surface-shadow: 0 0 0 0 transparent;
+    --overlay-shadow:
+      0 0 1px 0 oklch(0.90 0.02 155 / 0.15) inset,
+      0 8px 24px 0 oklch(0 0 0 / 0.4);
+    --field-shadow: 0 0 0 0 transparent;
+
+    /* Scrollbar */
+    --scrollbar: oklch(0.35 0.012 160);
+  }
+}
+
+/* ================================================================
+   COMPONENT OVERRIDES — BEM classes for HeroUI components
+   ================================================================ */
+@layer components {
+  .button {
+    @apply font-medium tracking-tight;
+  }
+
+  .card {
+    @apply border-border;
+  }
+
+  .tabs__tab--selected {
+    color: var(--accent);
+  }
+}
