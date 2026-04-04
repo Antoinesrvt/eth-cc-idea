@@ -1,108 +1,126 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { setGlobalAuth, getGlobalWallet } from "./use-api";
 
 const IS_LOCAL = process.env.NEXT_PUBLIC_ENV === "local";
-const PRIVY_CONFIGURED = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID && !IS_LOCAL;
 
-// Anvil default accounts for local dev
-const ANVIL_ACCOUNTS = [
-  { address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", label: "Agency (Account #0)" },
-  { address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", label: "Client (Account #1)" },
-  { address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC", label: "Investor (Account #2)" },
-];
-
+/**
+ * Unified auth hook.
+ *
+ * Local dev (ENV=local):
+ *   Uses window.ethereum (Rabby/MetaMask) to connect directly.
+ *   No Privy, no SIWE, no OAuth. Just eth_requestAccounts.
+ *
+ * Production (ENV=testnet|mainnet):
+ *   Uses Privy (Google, Telegram, wallet).
+ *   Privy manages session via cookies.
+ */
 export function useAuth() {
-  // ── Local dev mode: pick an Anvil account, no Privy ──
   if (IS_LOCAL) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const [accountIndex, setAccountIndex] = useState(0);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const [loggedIn, setLoggedIn] = useState(false);
+    return useLocalAuth();
+  }
+  return usePrivyAuth();
+}
 
-    const account = ANVIL_ACCOUNTS[accountIndex];
+// ── Local: direct wallet connection via window.ethereum ──────────────
 
-    const login = () => {
-      const choice = window.prompt(
-        `Select Anvil account:\n0 — Agency (${ANVIL_ACCOUNTS[0].address.slice(0, 8)}...)\n1 — Client (${ANVIL_ACCOUNTS[1].address.slice(0, 8)}...)\n2 — Investor (${ANVIL_ACCOUNTS[2].address.slice(0, 8)}...)\n\nEnter 0, 1, or 2:`,
-        "0",
-      );
-      const idx = parseInt(choice || "0");
-      if (idx >= 0 && idx < ANVIL_ACCOUNTS.length) {
-        setAccountIndex(idx);
-        // Set auth SYNCHRONOUSLY before any renders/fetches
-        setGlobalAuth(ANVIL_ACCOUNTS[idx].address);
+function useLocalAuth() {
+  const [address, setAddress] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    const saved = getGlobalWallet();
+    if (saved) setAddress(saved);
+    setReady(true);
+  }, []);
+
+  // Listen for account changes
+  useEffect(() => {
+    const eth = (window as unknown as { ethereum?: { on: (e: string, cb: (accounts: string[]) => void) => void } }).ethereum;
+    if (!eth) return;
+    const handler = (accounts: string[]) => {
+      if (accounts[0]) {
+        setAddress(accounts[0]);
+        setGlobalAuth(accounts[0]);
       } else {
-        setGlobalAuth(account.address);
+        setAddress(null);
+        setGlobalAuth(null);
       }
-      setLoggedIn(true);
     };
+    eth.on("accountsChanged", handler);
+  }, []);
 
-    // On mount: restore from localStorage if previously logged in
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => {
-      const saved = getGlobalWallet();
-      if (saved) {
-        const idx = ANVIL_ACCOUNTS.findIndex(a => a.address.toLowerCase() === saved.toLowerCase());
-        if (idx >= 0) {
-          setAccountIndex(idx);
-          setLoggedIn(true);
-        }
-      }
-    }, []);
-
-    return {
-      login,
-      logout: () => { setLoggedIn(false); setGlobalAuth(null); window.location.reload(); },
-      authenticated: loggedIn,
-      user: null,
-      ready: true,
-      walletAddress: loggedIn ? account.address : undefined,
-      displayName: loggedIn ? account.label : null,
-      getAuthToken: async (): Promise<string | null> => null,
-    };
-  }
-
-  // ── Privy not configured ──
-  if (!PRIVY_CONFIGURED) {
-    return {
-      login: () => alert("Set NEXT_PUBLIC_PRIVY_APP_ID in .env.local, or use ENV=local for Anvil accounts"),
-      logout: () => {},
-      authenticated: false,
-      user: null,
-      ready: true,
-      walletAddress: undefined as string | undefined,
-      displayName: null as string | null,
-      getAuthToken: async (): Promise<string | null> => null,
-    };
-  }
-
-  // ── Production: Privy ──
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { login, logout, authenticated, user, ready, getAccessToken } = usePrivy();
-
-  const walletAddress = user?.wallet?.address;
-  const displayName =
-    user?.email?.address ||
-    (walletAddress
-      ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-      : null);
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const getAuthToken = useCallback(async (): Promise<string | null> => {
-    if (!authenticated) return null;
-    try {
-      return await getAccessToken();
-    } catch {
-      return null;
+  const login = useCallback(async () => {
+    const eth = (window as unknown as { ethereum?: { request: (args: { method: string }) => Promise<string[]> } }).ethereum;
+    if (!eth) {
+      alert("Install MetaMask or Rabby to connect locally");
+      return;
     }
-  }, [authenticated, getAccessToken]);
+    try {
+      const accounts = await eth.request({ method: "eth_requestAccounts" });
+      if (accounts[0]) {
+        setAddress(accounts[0]);
+        setGlobalAuth(accounts[0]);
+      }
+    } catch {
+      console.error("Wallet connection rejected");
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    setAddress(null);
+    setGlobalAuth(null);
+  }, []);
 
   return {
     login,
     logout,
+    authenticated: !!address,
+    user: null,
+    ready,
+    walletAddress: address ?? undefined,
+    displayName: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
+    getAuthToken: async (): Promise<string | null> => null,
+  };
+}
+
+// ── Production: Privy ────────────────────────────────────────────────
+
+function usePrivyAuth() {
+  // Dynamic import to avoid loading Privy in local mode
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { usePrivy } = require("@privy-io/react-auth");
+  const { login, logout, authenticated, user, ready, getAccessToken } = usePrivy();
+
+  const walletAddress = user?.wallet?.address;
+
+  // Sync wallet to global headers
+  useEffect(() => {
+    if (authenticated && walletAddress) {
+      setGlobalAuth(walletAddress);
+    }
+  }, [authenticated, walletAddress]);
+
+  const displayName =
+    user?.email?.address ||
+    (walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : null);
+
+  const getAuthToken = useCallback(async (): Promise<string | null> => {
+    if (!authenticated) return null;
+    try {
+      const token = await getAccessToken();
+      if (token) setGlobalAuth(walletAddress ?? null, token);
+      return token;
+    } catch {
+      return null;
+    }
+  }, [authenticated, getAccessToken, walletAddress]);
+
+  return {
+    login,
+    logout: () => { logout(); setGlobalAuth(null); },
     authenticated,
     user,
     ready,
