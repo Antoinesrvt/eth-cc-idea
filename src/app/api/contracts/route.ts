@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Deploy on-chain via factory if configured AND client is known
+    console.log("[contracts/POST] Factory check:", { isFactoryConfigured: isFactoryConfigured(), client, factoryAddr: process.env.CONTRACT_FACTORY_ADDRESS?.slice(0, 10), deployerKey: process.env.DEPLOYER_PRIVATE_KEY ? "set" : "missing" });
     if (isFactoryConfigured() && client) {
       try {
         const result = await createDeal({
