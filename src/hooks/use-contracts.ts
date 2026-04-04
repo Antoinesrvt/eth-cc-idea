@@ -36,14 +36,17 @@ export function useContract(id: string) {
   const { getAuthToken, authenticated, ready, walletAddress } = useAuth();
   const [token, setToken] = useState<string | null>(null);
 
+  const isLocal = process.env.NEXT_PUBLIC_ENV === "local";
+
   useEffect(() => {
-    if (ready && authenticated) {
+    if (!isLocal && ready && authenticated) {
       getAuthToken().then(setToken);
     }
-  }, [ready, authenticated, getAuthToken]);
+  }, [ready, authenticated, getAuthToken, isLocal]);
 
-  // Wait for auth to resolve before the first request to avoid a 403 flash
-  const waitingForAuth = !ready || (authenticated && !token);
+  // In local mode: no token needed, just wait for ready
+  // In prod: wait for Privy token to resolve
+  const waitingForAuth = isLocal ? !ready : (!ready || (authenticated && !token));
 
   const { data, loading, error, refresh } = useApi<ContractDetail>(
     `/api/contracts/${id}`,
