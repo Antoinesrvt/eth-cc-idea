@@ -58,7 +58,7 @@ contract ServiceContractTest is Test {
         );
 
         // Deploy ContractToken owned by ServiceContract
-        token = new ContractToken("Deal Token", "DEAL", address(sc));
+        token = new ContractToken("Deal Token", "DEAL", address(sc), milestoneAmount * 2);
 
         // Fund client with USDC
         usdc.mint(client, 100_000 * 10**18);
@@ -158,6 +158,7 @@ contract ServiceContractTest is Test {
         vm.prank(client);
         sc.approveMilestone(1);
 
+        vm.prank(client);
         ServiceContract.ContractData memory data = sc.getContractData();
         assertEq(uint8(data.status), 2); // Completed
     }

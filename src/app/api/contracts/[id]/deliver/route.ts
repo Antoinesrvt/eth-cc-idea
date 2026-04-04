@@ -97,6 +97,14 @@ export async function POST(
       return Response.json({ error: "Contract not found" }, { status: 404 });
     }
 
+    // Only allow delivery on active contracts
+    if (contract.status !== "active") {
+      return Response.json(
+        { error: `Cannot deliver on a contract with status "${contract.status}". Contract must be active.` },
+        { status: 400 },
+      );
+    }
+
     // Chain-first: submit on-chain before updating DB
     if (isBlockchainConfigured() && contract.onChainAddress) {
       try {

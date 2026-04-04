@@ -54,16 +54,19 @@ export async function buyTokens(params: {
 
   const router = new ethers.Contract(routerAddress, ROUTER_ABI, signer);
   const recipientAddress = await signer.getAddress();
-  const deadline = Math.floor(Date.now() / 1000) + 1800; // 30 min
 
-  // amountOutMinimum = 0 for hackathon (no MEV risk in testnet)
+  // Calculate amountOutMinimum with slippage protection
+  const amountOutMinimum = await calculateMinOutput(
+    usdcAddress, tokenAddress, usdcAmount, slippageBps, signer.provider!,
+  );
+
   const swapParams = {
     tokenIn: usdcAddress,
     tokenOut: tokenAddress,
     fee: DEFAULT_FEE_TIER,
     recipient: recipientAddress,
     amountIn: usdcAmount,
-    amountOutMinimum: BigInt(0),
+    amountOutMinimum,
     sqrtPriceLimitX96: BigInt(0),
   };
 
@@ -85,7 +88,7 @@ export async function sellTokens(params: {
   slippageBps?: number; // default 50 bps = 0.5%
   signer: ethers.Signer;
 }): Promise<string> {
-  const { tokenAddress, usdcAddress, tokenAmount, signer } = params;
+  const { tokenAddress, usdcAddress, tokenAmount, slippageBps = 50, signer } = params;
   const routerAddress = CHAIN_CONFIG.uniswap.router;
 
   // Approve router to spend ContractToken
@@ -94,13 +97,18 @@ export async function sellTokens(params: {
   const router = new ethers.Contract(routerAddress, ROUTER_ABI, signer);
   const recipientAddress = await signer.getAddress();
 
+  // Calculate amountOutMinimum with slippage protection
+  const amountOutMinimum = await calculateMinOutput(
+    tokenAddress, usdcAddress, tokenAmount, slippageBps, signer.provider!,
+  );
+
   const swapParams = {
     tokenIn: tokenAddress,
     tokenOut: usdcAddress,
     fee: DEFAULT_FEE_TIER,
     recipient: recipientAddress,
     amountIn: tokenAmount,
-    amountOutMinimum: BigInt(0),
+    amountOutMinimum,
     sqrtPriceLimitX96: BigInt(0),
   };
 
@@ -108,6 +116,26 @@ export async function sellTokens(params: {
   const receipt = await tx.wait(1);
   console.log(`[uniswap] Sold tokens: ${tokenAmount} ContractToken → USDC (tx: ${receipt.hash})`);
   return receipt.hash as string;
+}
+
+/**
+ * Calculate the minimum output amount with slippage protection.
+ * Gets a quote first; if quote fails, falls back to 2% slippage from input amount.
+ */
+async function calculateMinOutput(
+  tokenIn: string,
+  tokenOut: string,
+  amountIn: bigint,
+  slippageBps: number,
+  provider: ethers.Provider,
+): Promise<bigint> {
+  const quote = await getQuote({ tokenIn, tokenOut, amount: amountIn, provider });
+  if (quote > BigInt(0)) {
+    return quote * BigInt(10000 - slippageBps) / BigInt(10000);
+  }
+  // Fallback: apply 2% slippage from input amount (conservative estimate)
+  console.warn("[uniswap] Quote unavailable, using 2% fallback slippage from input amount");
+  return amountIn * BigInt(9800) / BigInt(10000);
 }
 
 /**

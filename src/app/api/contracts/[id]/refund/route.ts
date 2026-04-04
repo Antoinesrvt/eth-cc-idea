@@ -21,6 +21,17 @@ export async function POST(
       return Response.json({ error: "Contract not found" }, { status: 404 });
     }
 
+    // Block refund if any milestone has been approved or delivered
+    const hasApprovedOrDelivered = contract.milestones.some(
+      (m) => m.status === "approved" || m.status === "delivered",
+    );
+    if (hasApprovedOrDelivered) {
+      return Response.json(
+        { error: "Cannot refund: one or more milestones have been approved or delivered" },
+        { status: 400 },
+      );
+    }
+
     // Must be in a refundable state
     if (contract.status !== "failed" && contract.status !== "disputed") {
       // If contract is active/completed, mark it as failed first

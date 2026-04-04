@@ -14,7 +14,6 @@ contract ServiceContract is ReentrancyGuard {
 
     // ── Custom Errors ────────────────────────────────────────────────────
 
-    error NotActive();
     error NotClientOrPlatform();
     error InvalidAmount();
     error InvalidMilestone();
@@ -67,6 +66,8 @@ contract ServiceContract is ReentrancyGuard {
     event ContractCompleted(uint256 totalPaid);
     event ContractFailed(uint256 refundAmount);
     event EscrowRefunded(address indexed client, uint256 amount);
+    event TokenAddressSet(address indexed token);
+    event TokensMinted(address indexed to, uint256 amount);
 
     // ── Constants ────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ contract ServiceContract is ReentrancyGuard {
     IERC20 public immutable paymentToken;   // tUSD — the ERC20 used for all payments
     address public tokenAddress;             // ContractToken address (set by factory)
     uint256 private _totalPaid;
+    mapping(uint256 => uint8) public milestoneDisputeCount;
 
 
     // ── Modifiers ────────────────────────────────────────────────────────
@@ -279,9 +281,11 @@ contract ServiceContract is ReentrancyGuard {
 
         Milestone storage m = _milestones[milestoneId];
         require(m.status == MilestoneStatus.Delivered, "Not delivered");
+        require(milestoneDisputeCount[milestoneId] < 2, "Dispute limit reached");
 
         m.status = MilestoneStatus.Disputed;
         _contractData.status = ContractStatus.Disputed;
+        milestoneDisputeCount[milestoneId]++;
 
         emit MilestoneDisputed(milestoneId);
     }
@@ -347,6 +351,7 @@ contract ServiceContract is ReentrancyGuard {
     /// @notice Mark the contract as failed. Sets all non-approved milestones to Failed.
     ///         Callable by client or through governance.
     function markFailed() external onlyClientOrOperator {
+        require(_contractData.status != ContractStatus.Draft, "Cannot fail draft");
         require(
             _contractData.status != ContractStatus.Completed &&
             _contractData.status != ContractStatus.Failed,
@@ -373,6 +378,7 @@ contract ServiceContract is ReentrancyGuard {
         require(tokenAddress == address(0), "Token already set");
         require(_token != address(0), "Invalid token");
         tokenAddress = _token;
+        emit TokenAddressSet(_token);
     }
 
     /// @notice Returns the token address.
@@ -388,6 +394,7 @@ contract ServiceContract is ReentrancyGuard {
         require(_contractData.status == ContractStatus.Active, "Not active");
         require(tokenAddress != address(0), "Token not set");
         ContractToken(tokenAddress).mint(to, amount);
+        emit TokensMinted(to, amount);
     }
 
     // ── Agency Functions ─────────────────────────────────────────────────
@@ -410,6 +417,7 @@ contract ServiceContract is ReentrancyGuard {
             "Not pending or rejected"
         );
         require(proofHash != bytes32(0), "Empty proof hash");
+        require(m.deadline == 0 || block.timestamp <= m.deadline, "Deadline passed");
 
         m.status = MilestoneStatus.Delivered;
         m.proofHash = proofHash;
@@ -422,9 +430,30 @@ contract ServiceContract is ReentrancyGuard {
 
     // ── View Functions ───────────────────────────────────────────────────
 
-    /// @notice Returns the full contract metadata.
+    /// @notice Returns the full contract metadata. Restricted to client, agency, or platform treasury.
     function getContractData() external view returns (ContractData memory) {
+        require(
+            msg.sender == _contractData.client ||
+            msg.sender == _contractData.agency ||
+            msg.sender == platformTreasury,
+            "Not authorized"
+        );
         return _contractData;
+    }
+
+    /// @notice Returns public contract data without the client address.
+    function getPublicData() external view returns (
+        address agency,
+        uint256 totalValue,
+        ContractStatus status,
+        uint256 milestoneCount_
+    ) {
+        return (
+            _contractData.agency,
+            _contractData.totalValue,
+            _contractData.status,
+            _milestones.length
+        );
     }
 
     /// @notice Returns a single milestone by index.

@@ -3,6 +3,27 @@ import { getProvider, getDeployerSigner } from "./clients";
 import { CHAIN_CONFIG } from "./config";
 import { SERVICE_CONTRACT_ABI } from "./abis";
 
+const MAX_GAS_LIMIT = 1_000_000;
+
+/**
+ * Estimate gas for a contract call, adding a 30% buffer.
+ * Capped at MAX_GAS_LIMIT to prevent runaway gas.
+ */
+async function estimateGasWithBuffer(
+  contract: ethers.Contract,
+  method: string,
+  args: unknown[] = [],
+): Promise<bigint> {
+  try {
+    const estimated = await contract[method].estimateGas(...args);
+    const buffered = (estimated * BigInt(130)) / BigInt(100);
+    return buffered > BigInt(MAX_GAS_LIMIT) ? BigInt(MAX_GAS_LIMIT) : buffered;
+  } catch {
+    // Fallback if estimation fails
+    return BigInt(MAX_GAS_LIMIT);
+  }
+}
+
 /**
  * Deposit USDC into the service contract escrow.
  * Handles ERC20 approval automatically before calling depositEscrow().
@@ -50,15 +71,16 @@ export async function depositEscrow(
   }
 
   // 3. Call depositEscrow() — transfers full totalValue from signer to contract
-  //    Fetch nonce explicitly to avoid stale cache after the approve tx above.
+  //    Use a fresh signer to avoid stale nonce cache after the approve tx above.
+  const freshSigner = getDeployerSigner();
   const contract = new ethers.Contract(
     contractAddress,
     SERVICE_CONTRACT_ABI,
-    signer,
+    freshSigner,
   );
 
-  const nonce = await signer.getNonce();
-  const tx = await contract.depositEscrow({ gasLimit: 300_000, nonce });
+  const gasLimit = await estimateGasWithBuffer(contract, "depositEscrow");
+  const tx = await contract.depositEscrow({ gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }
@@ -86,7 +108,8 @@ export async function submitDeliverable(
     ethers.toBeArray(ethers.id(proofHash)),
     32,
   );
-  const tx = await contract.submitDeliverable(milestoneId, proofBytes);
+  const gasLimit = await estimateGasWithBuffer(contract, "submitDeliverable", [milestoneId, proofBytes]);
+  const tx = await contract.submitDeliverable(milestoneId, proofBytes, { gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }
@@ -109,7 +132,8 @@ export async function approveMilestone(
     signer,
   );
 
-  const tx = await contract.approveMilestone(milestoneId);
+  const gasLimit = await estimateGasWithBuffer(contract, "approveMilestone", [milestoneId]);
+  const tx = await contract.approveMilestone(milestoneId, { gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }
@@ -139,7 +163,8 @@ export async function rejectMilestone(
     32,
   );
 
-  const tx = await contract.rejectMilestone(milestoneId, reasonBytes);
+  const gasLimit = await estimateGasWithBuffer(contract, "rejectMilestone", [milestoneId, reasonBytes]);
+  const tx = await contract.rejectMilestone(milestoneId, reasonBytes, { gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }
@@ -165,7 +190,8 @@ export async function refundMilestone(
     signer,
   );
 
-  const tx = await contract.refundMilestone(milestoneId);
+  const gasLimit = await estimateGasWithBuffer(contract, "refundMilestone", [milestoneId]);
+  const tx = await contract.refundMilestone(milestoneId, { gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }
@@ -182,7 +208,8 @@ export async function markContractFailed(
   }
   const signer = getDeployerSigner();
   const contract = new ethers.Contract(contractAddress, SERVICE_CONTRACT_ABI, signer);
-  const tx = await contract.markFailed();
+  const gasLimit = await estimateGasWithBuffer(contract, "markFailed");
+  const tx = await contract.markFailed({ gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }
@@ -198,7 +225,8 @@ export async function refundEscrow(
   }
   const signer = getDeployerSigner();
   const contract = new ethers.Contract(contractAddress, SERVICE_CONTRACT_ABI, signer);
-  const tx = await contract.refundEscrow();
+  const gasLimit = await estimateGasWithBuffer(contract, "refundEscrow");
+  const tx = await contract.refundEscrow({ gasLimit });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }

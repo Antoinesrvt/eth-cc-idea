@@ -70,11 +70,20 @@ export async function POST(
       }
     }
 
-    const updatedContract = await db.contracts.updateMilestone(
+    // Atomic conditional update — only reject if milestone is still "delivered"
+    const updatedContract = await db.contracts.conditionalUpdateMilestone(
       id,
       parsed.data.milestoneId,
+      "delivered",
       { status: "rejected" },
     );
+
+    if (!updatedContract) {
+      return Response.json(
+        { error: "Milestone status changed — it is no longer in 'delivered' state. Please refresh and try again." },
+        { status: 409 },
+      );
+    }
 
     // Notify agency that milestone was rejected
     if (contract.agency) {

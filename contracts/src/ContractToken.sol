@@ -6,10 +6,17 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ContractToken is ERC20, ERC20Burnable, Ownable {
-    constructor(string memory _name, string memory _symbol, address _owner)
-        ERC20(_name, _symbol) Ownable(_owner) {}
+    uint256 public maxSupply;
+
+    constructor(string memory _name, string memory _symbol, address _owner, uint256 _maxSupply)
+        ERC20(_name, _symbol) Ownable(_owner)
+    {
+        require(_maxSupply > 0, "Max supply must be > 0");
+        maxSupply = _maxSupply;
+    }
 
     function mint(address to, uint256 amount) external onlyOwner {
+        require(totalSupply() + amount <= maxSupply, "Cap exceeded");
         _mint(to, amount);
     }
 }

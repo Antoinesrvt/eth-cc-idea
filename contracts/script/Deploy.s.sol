@@ -27,7 +27,7 @@ contract Deploy is Script {
         } catch {
             console.log("Deploying test USDC...");
             vm.startBroadcast(deployerKey);
-            ContractToken usdc = new ContractToken("Test USDC", "tUSDC", deployer);
+            ContractToken usdc = new ContractToken("Test USDC", "tUSDC", deployer, type(uint256).max);
             usdc.mint(deployer, 10_000_000 * 10**18); // 10M
             vm.stopBroadcast();
             paymentToken = address(usdc);
@@ -57,7 +57,7 @@ contract Deploy is Script {
         address deployer = vm.addr(deployerKey);
 
         vm.startBroadcast(deployerKey);
-        ContractToken usdc = new ContractToken("Test USDC", "tUSDC", deployer);
+        ContractToken usdc = new ContractToken("Test USDC", "tUSDC", deployer, type(uint256).max);
         usdc.mint(deployer, 10_000_000 * 10**18);
         vm.stopBroadcast();
 

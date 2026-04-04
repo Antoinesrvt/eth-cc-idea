@@ -1,12 +1,16 @@
 import { type NextRequest } from "next/server";
+import { ethers } from "ethers";
 import { z } from "zod";
 import { db, ensureInit } from "@/lib/db";
 import { isBlockchainConfigured } from "@/lib/blockchain";
 import { CHAIN_CONFIG } from "@/lib/blockchain/config";
-import { getDeployerSigner } from "@/lib/blockchain/clients";
+import { getDeployerSigner, getProvider } from "@/lib/blockchain/clients";
+import { getTokenDecimals } from "@/lib/blockchain/utils";
 import { buyTokens } from "@/lib/uniswap";
 import { requireAuth } from "@/lib/auth";
 import { notifyUser } from "@/lib/email";
+
+const ERC20_TOTAL_SUPPLY_ABI = ["function totalSupply() view returns (uint256)"];
 
 const BuyBodySchema = z.object({
   amount: z.number().positive(),
@@ -53,12 +57,39 @@ export async function POST(
 
     const { amount, buyerAddress } = parsed.data;
 
-    // Price per token = totalValue / 100 tokens (in USDC, 6 decimals)
-    const pricePerToken = contract.totalValue / 100;
+    // Determine token supply: try tokenizationExposure JSON, then on-chain totalSupply, fallback to 100
+    let tokenSupply = 100;
+    if (contract.tokenizationExposure) {
+      try {
+        const exposure = JSON.parse(contract.tokenizationExposure);
+        if (exposure.tokenSupply && typeof exposure.tokenSupply === "number") {
+          tokenSupply = exposure.tokenSupply;
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    if (tokenSupply === 100 && contract.tokenAddress && isBlockchainConfigured()) {
+      try {
+        const tokenContract = new ethers.Contract(
+          contract.tokenAddress,
+          ERC20_TOTAL_SUPPLY_ABI,
+          getProvider(),
+        );
+        const onChainSupply = await tokenContract.totalSupply();
+        // ContractToken uses 18 decimals
+        const supplyNum = Number(ethers.formatUnits(onChainSupply, 18));
+        if (supplyNum > 0) tokenSupply = supplyNum;
+      } catch {
+        console.warn("[marketplace/buy] Could not read on-chain totalSupply, using default");
+      }
+    }
+
+    const pricePerToken = contract.totalValue / tokenSupply;
     const totalCost = amount * pricePerToken;
 
     console.log(
-      `[marketplace] Buy: ${buyerAddress} purchasing ${amount} tokens of ${tokenId} for $${totalCost} via Uniswap`,
+      `[marketplace] Buy: ${buyerAddress} purchasing ${amount} tokens of ${tokenId} for $${totalCost} via Uniswap (supply: ${tokenSupply})`,
     );
 
     let txHash: string | undefined;
@@ -67,8 +98,9 @@ export async function POST(
     if (isBlockchainConfigured() && CHAIN_CONFIG.paymentTokenAddress) {
       try {
         const signer = getDeployerSigner();
-        // Convert USDC cost to 6-decimal units
-        const usdcAmount = BigInt(Math.round(totalCost * 1e6));
+        // Convert USDC cost to proper decimal units
+        const usdcDecimals = await getTokenDecimals(CHAIN_CONFIG.paymentTokenAddress, getProvider());
+        const usdcAmount = BigInt(Math.round(totalCost * 10 ** usdcDecimals));
         txHash = await buyTokens({
           tokenAddress: contract.tokenAddress!,
           usdcAddress: CHAIN_CONFIG.paymentTokenAddress,

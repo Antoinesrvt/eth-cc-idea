@@ -266,6 +266,34 @@ export const SERVICE_CONTRACT_ABI = [
   },
   {
     "type": "function",
+    "name": "getPublicData",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "agency",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "totalValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "enum ServiceContract.ContractStatus"
+      },
+      {
+        "name": "milestoneCount_",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getTokenAddress",
     "inputs": [],
     "outputs": [
@@ -293,6 +321,25 @@ export const SERVICE_CONTRACT_ABI = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "milestoneDisputeCount",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "stateMutability": "view"
@@ -651,6 +698,38 @@ export const SERVICE_CONTRACT_ABI = [
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "TokenAddressSet",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TokensMinted",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "InvalidAmount",
     "inputs": []
@@ -668,11 +747,6 @@ export const SERVICE_CONTRACT_ABI = [
   {
     "type": "error",
     "name": "MilestoneNotRefundable",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotActive",
     "inputs": []
   },
   {

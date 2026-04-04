@@ -20,6 +20,8 @@ contract ContractFactory {
         address indexed token
     );
 
+    event TokenAddressLinked(address indexed serviceContract, address indexed token);
+
     address public immutable platformTreasury;
     address public immutable paymentToken;
 
@@ -58,11 +60,18 @@ contract ContractFactory {
             paymentToken
         ));
 
+        // Calculate maxSupply from total milestone value
+        uint256 totalValue = 0;
+        for (uint256 i; i < milestoneAmounts.length; i++) {
+            totalValue += milestoneAmounts[i];
+        }
+
         // Deploy ContractToken owned by the ServiceContract
-        token = address(new ContractToken(tokenName, tokenSymbol, serviceContract));
+        token = address(new ContractToken(tokenName, tokenSymbol, serviceContract, totalValue));
 
         // Link token to service contract so it can call mint
         ServiceContract(serviceContract).setTokenAddress(token);
+        emit TokenAddressLinked(serviceContract, token);
 
         // Record
         uint256 dealId = deals.length;

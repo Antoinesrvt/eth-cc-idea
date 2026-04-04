@@ -114,12 +114,31 @@ async function handleCreate(
     );
   }
 
+  // Dispute spam prevention: max 2 disputes per milestone
+  const existingDisputes = (await db.disputes.findByContract(contractId))
+    .filter((d) => d.milestoneId === data.milestoneId);
+  if (existingDisputes.length >= 2) {
+    return Response.json(
+      { error: "Maximum of 2 disputes per milestone has been reached" },
+      { status: 400 },
+    );
+  }
+
   const initiatedBy = callerRole;
 
-  // Mark milestone as disputed
-  await db.contracts.updateMilestone(contractId, data.milestoneId, {
-    status: "disputed",
-  });
+  // Atomic conditional update — only dispute if milestone is still delivered/rejected
+  const disputeUpdateResult = await db.contracts.conditionalUpdateMilestone(
+    contractId,
+    data.milestoneId,
+    milestone.status,
+    { status: "disputed" },
+  );
+  if (!disputeUpdateResult) {
+    return Response.json(
+      { error: "Milestone status changed before dispute could be created. Please refresh and try again." },
+      { status: 409 },
+    );
+  }
   await db.contracts.update(contractId, { status: "disputed" });
 
   // Create dispute record — goes straight to evidence phase
@@ -335,12 +354,17 @@ async function handleSubmitEvidence(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await ensureInit();
     const { id } = await params;
+
+    // Auth: only parties to the contract can view disputes
+    const auth = await requireRole(request, id, "party");
+    if ("error" in auth) return auth.error;
+
     const disputes = await db.disputes.findByContract(id);
     return Response.json(disputes);
   } catch (error) {

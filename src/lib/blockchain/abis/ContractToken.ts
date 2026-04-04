@@ -19,6 +19,11 @@ export const CONTRACT_TOKEN_ABI = [
         "name": "_owner",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_maxSupply",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "nonpayable"
@@ -130,6 +135,19 @@ export const CONTRACT_TOKEN_ABI = [
         "name": "",
         "type": "uint8",
         "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "maxSupply",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"

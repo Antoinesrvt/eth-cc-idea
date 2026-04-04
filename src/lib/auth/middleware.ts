@@ -1,12 +1,26 @@
 import { verifyPrivyToken } from "@/lib/payments/privy";
 import { db } from "@/lib/db";
 
+/**
+ * Authenticate the caller via Privy token.
+ *
+ * In development only (NODE_ENV=development OR ALLOW_HEADER_AUTH=true),
+ * X-Wallet-Address header is accepted as a fallback when no valid token
+ * is provided. In production this header is ignored entirely.
+ */
 export async function getAuthUser(request: Request): Promise<{ userId: string; walletAddress?: string } | null> {
   const authHeader = request.headers.get("authorization");
-  const headerWallet = request.headers.get("x-wallet-address");
+
+  const allowHeaderAuth =
+    process.env.NODE_ENV === "development" ||
+    process.env.ALLOW_HEADER_AUTH === "true";
+
+  const headerWallet = allowHeaderAuth
+    ? request.headers.get("x-wallet-address")
+    : null;
 
   if (!authHeader?.startsWith("Bearer ")) {
-    // No token but wallet header present — accept for hackathon demo
+    // No token — accept header wallet only in dev mode
     if (headerWallet) {
       return { userId: `wallet:${headerWallet}`, walletAddress: headerWallet };
     }
@@ -21,23 +35,22 @@ export async function getAuthUser(request: Request): Promise<{ userId: string; w
     return null;
   }
 
-  // verifyPrivyToken now fetches wallet address in one call
+  // Verify Privy token (also fetches wallet address)
   const result = await verifyPrivyToken(token);
 
-  // If Privy verification completely fails, fall back to wallet header
   if (!result) {
+    // Privy verification failed — do NOT fall back to header in production
     if (headerWallet) {
-      console.warn("[auth] Privy verification failed, falling back to X-Wallet-Address header");
+      console.warn("[auth] Privy verification failed, falling back to X-Wallet-Address header (dev only)");
       return { userId: `wallet:${headerWallet}`, walletAddress: headerWallet };
     }
     return null;
   }
 
-  // Fallback: check X-Wallet-Address header (sent by frontend)
+  // If Privy returned a user but no wallet, return 401-equivalent (null)
+  // rather than trusting a client-supplied header
   if (!result.walletAddress) {
-    if (headerWallet) {
-      result.walletAddress = headerWallet;
-    }
+    return result;
   }
 
   return result;

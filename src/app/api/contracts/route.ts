@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { db, ensureInit } from "@/lib/db";
-import { getAuthUser, requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 import { sendContractInvite } from "@/lib/email";
 import { isBlockchainConfigured, createDeal, isFactoryConfigured } from "@/lib/blockchain";
 import type { ContractStatus } from "@/lib/types";
@@ -209,12 +209,11 @@ export async function GET(request: NextRequest) {
   try {
     await ensureInit();
 
-    // Try auth token first, fall back to ?user= query param
-    const auth = await getAuthUser(request);
-    const walletAddress =
-      auth?.walletAddress ||
-      request.nextUrl.searchParams.get("user");
+    // Require proper authentication — no query param bypass
+    const auth = await requireAuth(request);
+    if (auth.error) return auth.error;
 
+    const walletAddress = auth.user!.walletAddress;
     if (!walletAddress) {
       return Response.json([]);
     }

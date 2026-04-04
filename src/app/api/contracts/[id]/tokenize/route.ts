@@ -109,11 +109,15 @@ export async function POST(
           );
         }
         {
+          // Mint tokens to the deployer (operator) so it can provide initial Uniswap liquidity
+          const deployerAddress = await signer.getAddress();
+          console.log(`[tokenize] ServiceContract: ${contract.onChainAddress}, Token: ${tokenAddress}`);
           const sc = new ethers.Contract(contract.onChainAddress, SERVICE_CONTRACT_ABI, signer);
           const mintAmount = ethers.parseUnits(totalSupply.toString(), 18);
-          const tx = await sc.mintTokens(agencyAddress, mintAmount, { gasLimit: 300_000 });
+          const nonce = await signer.getNonce();
+          const tx = await sc.mintTokens(deployerAddress, mintAmount, { gasLimit: 300_000, nonce });
           await tx.wait(1);
-          console.log(`[tokenize] Minted ${totalSupply} tokens via ServiceContract → ContractToken: ${tokenAddress}`);
+          console.log(`[tokenize] Minted ${totalSupply} tokens to deployer for liquidity provisioning`);
         }
 
         if (tokenAddress) {
@@ -129,8 +133,17 @@ export async function POST(
           // 3. Add initial liquidity
           if (poolAddress && poolAddress !== ethers.ZeroAddress) {
             const tokenAmount = ethers.parseUnits(totalSupply.toString(), 18);
-            // USDC = totalSupply * pricePerToken (6 decimals)
-            const usdcAmount = BigInt(Math.round(totalSupply * pricePerToken * 1e6));
+            // Query USDC decimals (test tUSDC = 18, real USDC = 6)
+            const usdcContract = new ethers.Contract(
+              CHAIN_CONFIG.paymentTokenAddress,
+              ["function decimals() view returns (uint8)"],
+              signer,
+            );
+            const usdcDecimals = await usdcContract.decimals().then(Number).catch(() => 18);
+            const usdcAmount = ethers.parseUnits(
+              (totalSupply * pricePerToken).toString(),
+              usdcDecimals,
+            );
 
             await addLiquidity({
               tokenAddress,

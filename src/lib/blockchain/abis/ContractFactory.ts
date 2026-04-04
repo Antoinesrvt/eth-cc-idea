@@ -179,5 +179,24 @@ export const CONTRACT_FACTORY_ABI = [
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TokenAddressLinked",
+    "inputs": [
+      {
+        "name": "serviceContract",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   }
 ] as const;

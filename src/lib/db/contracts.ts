@@ -231,6 +231,43 @@ export async function updateMilestone(
   return (await loadContract(contractId))!;
 }
 
+/**
+ * Atomic conditional milestone update — only updates if the current status
+ * matches `expectedStatus`. Returns null if the condition was not met (race).
+ */
+export async function conditionalUpdateMilestone(
+  contractId: string,
+  milestoneId: number,
+  expectedStatus: string,
+  data: Partial<Milestone>,
+): Promise<ServiceContract | null> {
+  const result = await getDb().update(milestonesTable).set({
+    ...(data.status !== undefined && { status: data.status }),
+    ...(data.proofHash !== undefined && { proofHash: data.proofHash ?? null }),
+    ...(data.deliveredAt !== undefined && { deliveredAt: data.deliveredAt?.toISOString() ?? null }),
+    ...(data.approvedAt !== undefined && { approvedAt: data.approvedAt?.toISOString() ?? null }),
+  }).where(
+    and(
+      eq(milestonesTable.contractId, contractId),
+      eq(milestonesTable.id, milestoneId),
+      eq(milestonesTable.status, expectedStatus),
+    )
+  );
+
+  // Drizzle returns { rowsAffected } or similar — check if any row was updated
+  const rowsAffected = (result as unknown as { rowsAffected?: number }).rowsAffected ?? 1;
+  if (rowsAffected === 0) {
+    return null;
+  }
+
+  // Update contract's updatedAt
+  await getDb().update(contractsTable).set({
+    updatedAt: new Date().toISOString(),
+  }).where(eq(contractsTable.id, contractId));
+
+  return (await loadContract(contractId))!;
+}
+
 export async function list(): Promise<ServiceContract[]> {
   const rows = await getDb().select().from(contractsTable);
   const results: ServiceContract[] = [];

@@ -55,9 +55,23 @@ export async function createDeal(params: CreateDealParams): Promise<{
     .map((log: ethers.Log) => { try { return iface.parseLog(log); } catch { return null; } })
     .find((e: ethers.LogDescription | null) => e?.name === "DealCreated");
 
+  if (!dealEvent) {
+    throw new Error(`DealCreated event not found in transaction ${receipt.hash}. Contract may not have been deployed correctly.`);
+  }
+
+  const serviceContractAddress = dealEvent.args.serviceContract as string;
+  const tokenAddress = dealEvent.args.token as string;
+
+  if (!serviceContractAddress || serviceContractAddress === ethers.ZeroAddress) {
+    throw new Error(`Factory returned ZeroAddress for serviceContract in tx ${receipt.hash}`);
+  }
+  if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
+    throw new Error(`Factory returned ZeroAddress for token in tx ${receipt.hash}`);
+  }
+
   return {
-    serviceContractAddress: dealEvent?.args?.serviceContract || ethers.ZeroAddress,
-    tokenAddress: dealEvent?.args?.token || ethers.ZeroAddress,
+    serviceContractAddress,
+    tokenAddress,
     txHash: receipt.hash,
   };
 }

@@ -4,6 +4,8 @@ import { db, ensureInit } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { calculateMilestoneRelease } from "@/lib/payments/escrow";
 import { approveMilestone, isBlockchainConfigured } from "@/lib/blockchain";
+import { getTokenDecimals } from "@/lib/blockchain/utils";
+import { getProvider } from "@/lib/blockchain/clients";
 import { notifyUser } from "@/lib/email";
 import { privateTransfer, isUnlinkConfigured } from "@/lib/privacy";
 
@@ -93,14 +95,23 @@ export async function POST(
       }
     }
 
-    const updatedContract = await db.contracts.updateMilestone(
+    // Atomic conditional update — only approve if milestone is still "delivered"
+    const updatedContract = await db.contracts.conditionalUpdateMilestone(
       id,
       parsed.data.milestoneId,
+      "delivered",
       {
         status: "approved",
         approvedAt: new Date(),
       },
     );
+
+    if (!updatedContract) {
+      return Response.json(
+        { error: "Milestone status changed — it is no longer in 'delivered' state. Please refresh and try again." },
+        { status: 409 },
+      );
+    }
 
     const escrow = await db.escrows.release(id, milestone.amount);
 
@@ -115,7 +126,8 @@ export async function POST(
           const agencyUnlink = createUnlinkClient(agencyRaw.unlinkMnemonic);
           const agencyUnlinkAddress = await agencyUnlink.getAddress();
           const toAgencyAmount = feeBreakdown.toAgency;
-          const payoutAmountWei = BigInt(Math.round(toAgencyAmount * 1e6)); // USDC 6 decimals
+          const decimals = await getTokenDecimals(PAYMENT_TOKEN, getProvider());
+          const payoutAmountWei = BigInt(Math.round(toAgencyAmount * 10 ** decimals));
           await privateTransfer(
             clientRaw.unlinkMnemonic,
             agencyUnlinkAddress,
