@@ -5,23 +5,24 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { Toaster } from "sonner";
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-// Chain config — auto-detects from NEXT_PUBLIC_ENV
-// Set NEXT_PUBLIC_ENV=local|testnet|mainnet in .env.local
-const env = process.env.NEXT_PUBLIC_ENV || "local";
-const chains: Record<string, { id: number; name: string; rpc: string; explorer: string }> = {
-  local:   { id: 31337, name: "Anvil (Local)", rpc: "http://localhost:8545", explorer: "http://localhost:8545" },
-  testnet: { id: 84532, name: "Base Sepolia",  rpc: "https://sepolia.base.org", explorer: "https://sepolia.basescan.org" },
-  mainnet: { id: 8453,  name: "Base",          rpc: "https://mainnet.base.org", explorer: "https://basescan.org" },
-};
-const c = chains[env] || chains.local;
+// Chain config — uses explicit NEXT_PUBLIC_ env vars with presets as fallback
+// For Anvil fork: NEXT_PUBLIC_CHAIN_ID=84532, NEXT_PUBLIC_RPC_URL=http://localhost:8545
+const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "84532");
+const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia.base.org";
+const isLocal = rpcUrl.includes("localhost");
 
 const appChain = {
-  id: c.id,
-  name: c.name,
+  id: chainId,
+  name: isLocal ? "Local Fork" : chainId === 8453 ? "Base" : "Base Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: [c.rpc] } },
-  blockExplorers: { default: { name: c.name, url: c.explorer } },
-  testnet: env !== "mainnet",
+  rpcUrls: { default: { http: [rpcUrl] } },
+  blockExplorers: {
+    default: {
+      name: isLocal ? "Local" : "BaseScan",
+      url: isLocal ? "http://localhost:8545" : chainId === 8453 ? "https://basescan.org" : "https://sepolia.basescan.org",
+    },
+  },
+  testnet: chainId !== 8453,
 } as const;
 
 export function Providers({ children }: { children: React.ReactNode }) {
