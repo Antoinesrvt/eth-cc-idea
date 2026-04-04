@@ -4,15 +4,10 @@ import { db, ensureInit } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { validateDeposit, createDepositRecord } from "@/lib/payments/escrow";
 import { depositEscrow, isBlockchainConfigured } from "@/lib/blockchain";
-import { notifyUser } from "@/lib/email";
-import { privateDeposit, isUnlinkConfigured } from "@/lib/privacy";
-
-// USDC on Base Sepolia
-const PAYMENT_TOKEN = process.env.PAYMENT_TOKEN_ADDRESS || "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 const DepositSchema = z.object({
   amount: z.number().positive(),
-  txHash: z.string().min(1),
+  txHash: z.string().optional(), // Optional — chain provides real txHash
 });
 
 export async function POST(
@@ -23,96 +18,59 @@ export async function POST(
     await ensureInit();
     const { id } = await params;
 
-    // Auth: only the client can deposit escrow
     const auth = await requireRole(request, id, "client");
     if ("error" in auth) return auth.error;
 
     const body = await request.json();
     const parsed = DepositSchema.safeParse(body);
-
     if (!parsed.success) {
-      return Response.json(
-        { error: "Invalid input", details: parsed.error.flatten() },
-        { status: 400 },
-      );
+      return Response.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
     }
+
+    const contract = await db.contracts.findById(id);
+    if (!contract) return Response.json({ error: "Contract not found" }, { status: 404 });
 
     const escrow = await db.escrows.findByContract(id);
-    if (!escrow) {
-      return Response.json(
-        { error: "Escrow not found for contract" },
-        { status: 404 },
-      );
-    }
+    if (!escrow) return Response.json({ error: "Escrow not found" }, { status: 404 });
 
-    // Reject if escrow is already fully funded
     if (escrow.depositedAmount >= escrow.totalAmount) {
-      return Response.json(
-        { error: "Escrow is already fully funded" },
-        { status: 400 },
-      );
+      return Response.json({ error: "Escrow already fully funded" }, { status: 400 });
     }
 
-    const validation = validateDeposit(
-      escrow.totalAmount,
-      escrow.depositedAmount,
-      parsed.data.amount,
-    );
-
+    const validation = validateDeposit(escrow.totalAmount, escrow.depositedAmount, parsed.data.amount);
     if (!validation.valid) {
       return Response.json({ error: validation.error }, { status: 400 });
     }
 
-    const depositRecord = createDepositRecord({
-      amount: parsed.data.amount,
-      txHash: parsed.data.txHash,
-    });
+    let txHash = parsed.data.txHash || `db_${Date.now().toString(36)}`;
 
+    // ── Chain-first: if contract is on-chain, deposit must succeed on-chain ──
+    if (contract.onChainAddress && isBlockchainConfigured()) {
+      try {
+        txHash = await depositEscrow(
+          contract.onChainAddress,
+          BigInt(Math.round(parsed.data.amount * 1e18)),
+        );
+        console.log("[deposit] On-chain success:", txHash);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "On-chain deposit failed";
+        console.error("[deposit] On-chain FAILED:", msg);
+        return Response.json(
+          { error: `Deposit failed on-chain: ${msg}. Please ensure you have approved USDC spending.` },
+          { status: 500 },
+        );
+      }
+    }
+
+    // ── DB: record deposit only after chain succeeds ──
+    const depositRecord = createDepositRecord({ amount: parsed.data.amount, txHash });
     const updatedEscrow = await db.escrows.addDeposit(id, depositRecord);
 
     if (updatedEscrow.depositedAmount >= updatedEscrow.totalAmount) {
       await db.contracts.update(id, { status: "active" });
     }
 
-    // Attempt real on-chain deposit if blockchain is configured
-    if (isBlockchainConfigured()) {
-      const contract = await db.contracts.findById(id);
-      if (contract?.onChainAddress) {
-        try {
-          const txHash = await depositEscrow(contract.onChainAddress, BigInt(Math.round(parsed.data.amount * 1e18)));
-          console.log("[deposit] On-chain depositEscrow success:", txHash);
-        } catch (err) {
-          console.warn("[deposit] On-chain depositEscrow failed:", err);
-        }
-      }
-    }
-
-    // Attempt private deposit into Unlink shielded pool (server-side ZKP)
-    if (isUnlinkConfigured()) {
-      try {
-        const rawUser = await db.users.findRawByAddress(auth.walletAddress);
-        if (rawUser?.unlinkMnemonic) {
-          const amountWei = BigInt(Math.round(parsed.data.amount * 1e6)); // USDC has 6 decimals
-          await privateDeposit(rawUser.unlinkMnemonic, PAYMENT_TOKEN, amountWei.toString());
-        }
-      } catch (unlinkError) {
-        // Unlink failure must not block the DB operation — log and continue
-        console.error("[Unlink] privateDeposit failed:", unlinkError);
-      }
-    }
-
-    // Notify agency that escrow was deposited
-    const contract = await db.contracts.findById(id);
-    if (contract?.agency) {
-      notifyUser(contract.agency, {
-        type: "escrow_deposited",
-        contractTitle: contract.title,
-        contractId: id,
-        amount: parsed.data.amount,
-      });
-    }
-
-    return Response.json(updatedEscrow);
+    return Response.json({ ...updatedEscrow, txHash });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Internal error" },

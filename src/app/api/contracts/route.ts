@@ -145,7 +145,10 @@ export async function POST(request: NextRequest) {
 
         console.log("[contracts/POST] On-chain:", result.serviceContractAddress, "token:", result.tokenAddress);
       } catch (chainErr) {
-        console.error("[contracts/POST] Factory deploy failed (DB-only):", chainErr instanceof Error ? chainErr.message : chainErr);
+        const chainErrMsg = chainErr instanceof Error ? chainErr.message : String(chainErr);
+        console.error("[contracts/POST] Factory deploy FAILED:", chainErrMsg);
+        // Contract created in DB but not on-chain — surface warning
+        (contract as Record<string, unknown>).warnings = [`On-chain deployment failed: ${chainErrMsg.slice(0, 100)}`];
       }
     }
 
