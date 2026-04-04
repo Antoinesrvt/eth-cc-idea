@@ -129,7 +129,7 @@ export default function DepositPage() {
         amount: remaining,
         txHash,
         paymentMethod: contract?.onChainAddress ? "crypto" : "db_only",
-      }, token, walletAddress);
+      });
 
       toast.success("Escrow deposited!");
 

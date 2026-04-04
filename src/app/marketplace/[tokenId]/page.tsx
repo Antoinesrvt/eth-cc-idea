@@ -107,10 +107,7 @@ export default function TokenDetailPage() {
         `/api/marketplace/${tokenId}/buy`,
         {
           amount: parsedAmount,
-          buyerAddress: walletAddress,
         },
-        token,
-        walletAddress,
       );
       setBuyResult(result);
       setBuyAmount("");

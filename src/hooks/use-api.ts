@@ -2,13 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+// Global wallet address — set by useAuth, read by all API calls
+let _globalWallet: string | null = null;
+let _globalToken: string | null = null;
+
+export function setGlobalAuth(wallet: string | null, token: string | null = null) {
+  _globalWallet = wallet;
+  _globalToken = token;
+}
+
 interface UseApiOptions {
-  /** Skip the initial fetch (useful for conditional fetching) */
   skip?: boolean;
-  /** Auth token to send in Authorization header */
-  token?: string | null;
-  /** Wallet address fallback — sent as X-Wallet-Address header */
-  walletAddress?: string | null;
 }
 
 interface UseApiResult<T> {
@@ -16,6 +20,13 @@ interface UseApiResult<T> {
   loading: boolean;
   error: string | null;
   refresh: () => void;
+}
+
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (_globalToken) headers["Authorization"] = `Bearer ${_globalToken}`;
+  if (_globalWallet) headers["X-Wallet-Address"] = _globalWallet;
+  return headers;
 }
 
 export function useApi<T>(
@@ -38,15 +49,7 @@ export function useApi<T>(
     setLoading(true);
     setError(null);
 
-    const headers: Record<string, string> = {};
-    if (options.token) {
-      headers["Authorization"] = `Bearer ${options.token}`;
-    }
-    if (options.walletAddress) {
-      headers["X-Wallet-Address"] = options.walletAddress;
-    }
-
-    fetch(url, { headers })
+    fetch(url, { headers: buildHeaders() })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -67,10 +70,8 @@ export function useApi<T>(
         }
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [url, options.skip, options.token, options.walletAddress, trigger]);
+    return () => { cancelled = true; };
+  }, [url, options.skip, trigger]);
 
   return { data, loading, error, refresh };
 }
@@ -78,37 +79,20 @@ export function useApi<T>(
 export async function postApi<T>(
   url: string,
   body: unknown,
-  token?: string | null,
-  walletAddress?: string | null,
 ): Promise<T> {
   const isFormData = body instanceof FormData;
-  const headers: Record<string, string> = {};
-  if (!isFormData) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  if (walletAddress) {
-    headers["X-Wallet-Address"] = walletAddress;
-  }
+  const headers = buildHeaders();
+  if (!isFormData) headers["Content-Type"] = "application/json";
+
   const res = await fetch(url, {
     method: "POST",
     headers,
     body: isFormData ? body : JSON.stringify(body),
   });
+
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json.error ?? `HTTP ${res.status}`);
   }
-
-  // Show toast warnings for failed blockchain operations
-  if (json.blockchainWarnings?.length) {
-    const { toast } = await import("sonner");
-    for (const w of json.blockchainWarnings) {
-      toast.warning(`On-chain ${w.operation.replace(/_/g, " ")} failed: ${w.error}`, { duration: 8000 });
-    }
-  }
-
   return json;
 }

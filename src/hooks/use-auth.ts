@@ -1,7 +1,8 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { setGlobalAuth } from "./use-api";
 
 const IS_LOCAL = process.env.NEXT_PUBLIC_ENV === "local";
 const PRIVY_CONFIGURED = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID && !IS_LOCAL;
@@ -35,9 +36,15 @@ export function useAuth() {
       setLoggedIn(true);
     };
 
+    // Sync wallet to global API headers
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => {
+      setGlobalAuth(loggedIn ? account.address : null);
+    }, [loggedIn, account.address]);
+
     return {
       login,
-      logout: () => setLoggedIn(false),
+      logout: () => { setLoggedIn(false); setGlobalAuth(null); },
       authenticated: loggedIn,
       user: null,
       ready: true,

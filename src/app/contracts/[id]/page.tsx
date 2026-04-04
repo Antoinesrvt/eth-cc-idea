@@ -373,7 +373,7 @@ export default function ContractDetailPage() {
                   if (!confirm("Are you sure? This will cancel the contract and refund remaining escrow.")) return;
                   try {
                     const token = await getAuthToken();
-                    await postApi(`/api/contracts/${id}/refund`, {}, token);
+                    await postApi(`/api/contracts/${id}/refund`, {});
                     toast.success("Contract cancelled and refund initiated");
                     refresh();
                   } catch (err) {
@@ -401,7 +401,7 @@ export default function ContractDetailPage() {
                     if (!confirm("Are you sure? This will cancel the contract and refund remaining escrow.")) return;
                     try {
                       const token = await getAuthToken();
-                      await postApi(`/api/contracts/${id}/refund`, {}, token);
+                      await postApi(`/api/contracts/${id}/refund`, {});
                       toast.success("Contract cancelled and refund initiated");
                       refresh();
                     } catch (err) {
@@ -428,7 +428,7 @@ export default function ContractDetailPage() {
                   onPress={async () => {
                     try {
                       const token = await getAuthToken();
-                      await postApi(`/api/contracts/${id}/refund`, {}, token);
+                      await postApi(`/api/contracts/${id}/refund`, {});
                       toast.success("Refund initiated");
                       refresh();
                     } catch (err) {

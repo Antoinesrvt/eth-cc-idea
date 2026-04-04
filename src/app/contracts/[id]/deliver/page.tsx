@@ -60,8 +60,7 @@ export default function DeliverPage() {
         proofHash,
         description: notes || undefined,
         links: links.filter(Boolean),
-        files: files.length > 0 ? files : undefined,
-      }, token, walletAddress);
+      });
       toast.success("Deliverable submitted");
       router.push(`/contracts/${id}`);
     } catch (err) {

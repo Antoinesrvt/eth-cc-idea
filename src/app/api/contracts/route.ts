@@ -68,15 +68,15 @@ export async function POST(request: NextRequest) {
     let inviteEmail: string | undefined;
     let status: ContractStatus;
 
+    // If email: generate invite, client TBD. If address: set client directly.
     if (isEmail(counterparty)) {
       client = "";
       inviteToken = crypto.randomUUID();
       inviteEmail = counterparty;
-      status = "invited";
     } else {
       client = counterparty.toLowerCase();
-      status = "pending_deposit";
     }
+    status = "draft"; // Always start as draft — simplify the flow
 
     console.log("[contracts/POST] Creating:", { agency, client: client || inviteEmail, status });
 

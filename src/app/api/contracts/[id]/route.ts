@@ -68,16 +68,14 @@ export async function GET(
       });
     }
 
-    // If the contract is still awaiting invite acceptance, return a helpful error
-    if (!isParty && contract.status === "invited" && contract.inviteToken) {
-      return Response.json(
-        { error: "This contract requires an invitation to join", code: "INVITE_REQUIRED", inviteRole: contract.inviteRole },
-        { status: 403 },
-      );
-    }
-
-    // Not a party and not a tokenized public view → require auth
+    // Not a party → 403 (but show invite link if available)
     if (!isParty) {
+      if (contract.inviteToken) {
+        return Response.json(
+          { error: "This contract requires an invitation", inviteToken: contract.inviteToken },
+          { status: 403 },
+        );
+      }
       return Response.json({ error: "Forbidden: not a party to this contract" }, { status: 403 });
     }
 
