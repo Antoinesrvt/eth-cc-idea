@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { db, ensureInit } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
-import { isBlockchainConfigured } from "@/lib/blockchain";
+import { isBlockchainConfigured, createDeal, isFactoryConfigured } from "@/lib/blockchain";
 import { notifyUser } from "@/lib/email";
 
 // GET: Look up contract by invite token, return summary with milestones
@@ -136,10 +136,35 @@ export async function POST(
       });
     }
 
-    // On-chain deployment via factory is not yet available — skipped
+    // Deploy on-chain via factory now that both parties are known
     const updated = await db.contracts.findById(contract.id);
-    if (updated && !updated.onChainAddress && isBlockchainConfigured() && updated.client && updated.agency) {
-      console.log("[invite/POST] On-chain factory deployment not available — DB-only contract created");
+    if (updated && !updated.onChainAddress && isFactoryConfigured() && updated.client && updated.agency) {
+      try {
+        const result = await createDeal({
+          client: updated.client,
+          agency: updated.agency,
+          bd: updated.bd,
+          bdFeeBps: Math.round((updated.bdFeePercent ?? 0) * 100),
+          termsHash: updated.termsHash || `terms_${updated.id}`,
+          milestones: updated.milestones.map((m) => ({
+            name: m.name,
+            amount: BigInt(Math.round(m.amount * 1e18)),
+            deadline: m.deadline ? Math.floor(m.deadline.getTime() / 1000) : 0,
+          })),
+          tokenName: `${updated.title} Token`,
+          tokenSymbol: (updated.title.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 4) || "DEAL") + updated.id.slice(0, 2).toUpperCase(),
+        });
+
+        await db.contracts.update(updated.id, {
+          onChainAddress: result.serviceContractAddress,
+          tokenAddress: result.tokenAddress,
+        });
+
+        console.log("[invite/POST] On-chain deployed:", result.serviceContractAddress, "token:", result.tokenAddress);
+      } catch (chainErr) {
+        const msg = chainErr instanceof Error ? chainErr.message : String(chainErr);
+        console.error("[invite/POST] Factory deploy FAILED:", msg);
+      }
     }
 
     return Response.json({

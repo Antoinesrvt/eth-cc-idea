@@ -18,10 +18,6 @@ const CONTRACT_TOKEN_ABI = [
   "function balanceOf(address owner) external view returns (uint256)",
 ];
 
-const CONTRACT_TOKEN_BYTECODE =
-  // We use the pre-compiled bytecode if available; otherwise skip on-chain deploy
-  process.env.CONTRACT_TOKEN_BYTECODE || "";
-
 const TokenizeBodySchema = z.object({
   tokenName: z.string().min(1).max(64),
   tokenSymbol: z.string().min(1).max(12),
@@ -103,35 +99,22 @@ export async function POST(
         const signer = getDeployerSigner();
         const agencyAddress = await signer.getAddress();
 
-        // 1. Deploy ContractToken if no existing token
+        // 1. Mint tokens on the factory-deployed ContractToken (already deployed by createDeal)
         if (!tokenAddress) {
-          // Use ContractToken bytecode from compiled artifacts or inline deployment
-          const tokenFactory = new ethers.ContractFactory(
-            [
-              "constructor(string memory _name, string memory _symbol, address _owner)",
-              "function mint(address to, uint256 amount) external",
-              "function approve(address spender, uint256 amount) external returns (bool)",
-              "function balanceOf(address owner) external view returns (uint256)",
-            ],
-            CONTRACT_TOKEN_BYTECODE || "0x", // Will fail gracefully if no bytecode
-            signer,
+          console.warn(`[tokenize] No tokenAddress on contract — factory may not have deployed yet`);
+          return Response.json(
+            { error: "Contract token not deployed. The contract must be created on-chain first (both parties must be set)." },
+            { status: 400 },
           );
+        }
 
-          if (CONTRACT_TOKEN_BYTECODE) {
-            const token = await tokenFactory.deploy(tokenName, tokenSymbol, agencyAddress, { gasLimit: 3_000_000 });
-            await token.waitForDeployment();
-            tokenAddress = await token.getAddress();
-            console.log(`[tokenize] ContractToken deployed: ${tokenAddress}`);
-
-            const tokenContract = new ethers.Contract(tokenAddress, CONTRACT_TOKEN_ABI, signer);
-            const mintAmount = ethers.parseUnits(totalSupply.toString(), 18);
-            await (await tokenContract.mint(agencyAddress, mintAmount)).wait(1);
-            console.log(`[tokenize] Minted ${totalSupply} tokens`);
-          } else {
-            // No bytecode — create a placeholder token address for DB tracking
-            tokenAddress = `0xtoken_${id.slice(0, 8)}`;
-            console.log(`[tokenize] No bytecode — using placeholder token: ${tokenAddress}`);
-          }
+        // Token exists from factory — mint the supply to the agency
+        {
+          const tokenContract = new ethers.Contract(tokenAddress, CONTRACT_TOKEN_ABI, signer);
+          const mintAmount = ethers.parseUnits(totalSupply.toString(), 18);
+          const tx = await tokenContract.mint(agencyAddress, mintAmount, { gasLimit: 200_000 });
+          await tx.wait(1);
+          console.log(`[tokenize] Minted ${totalSupply} tokens on existing token: ${tokenAddress}`);
         }
 
         if (tokenAddress) {
