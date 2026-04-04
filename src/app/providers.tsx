@@ -43,7 +43,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     </NextThemesProvider>
   );
 
-  if (!PRIVY_APP_ID) return themed;
+  // Skip Privy in local dev (use Anvil accounts directly)
+  const isLocal = process.env.NEXT_PUBLIC_ENV === "local";
+  if (!PRIVY_APP_ID || isLocal) return themed;
 
   return (
     <PrivyProvider
