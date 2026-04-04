@@ -71,9 +71,10 @@ export const ${exportName} = ${JSON.stringify(abi, null, 2)} as const;
   generated++;
 }
 
-// Generate barrel export
+// Generate barrel export — only include contracts that were actually generated
 const barrel =
   Object.entries(CONTRACTS)
+    .filter(([name]) => fs.existsSync(path.join(ABI_DIR, `${name}.ts`)))
     .map(([name, exportName]) => `export { ${exportName} } from "./${name}";`)
     .join("\n") + "\n";
 

@@ -120,15 +120,15 @@ const NOTIFICATION_CONFIG: Record<
     subject: (p) => `Dispute opened: ${p.milestoneName || p.contractTitle}`,
     body: (p) =>
       `<p>A dispute has been opened on milestone <strong>${p.milestoneName || "a milestone"}</strong> of contract <strong>${p.contractTitle}</strong>.</p>
-       <p>An AI agent will analyze the deliverables and contract terms, then issue a verdict.</p>
-       <p style="margin-top:12px;padding:12px;background:#fce4ec;border-radius:6px;">You will be notified once the AI verdict is ready. No action needed right now.</p>`,
+       <p>Both parties can now submit evidence to support their case.</p>
+       <p style="margin-top:12px;padding:12px;background:#fce4ec;border-radius:6px;">Action required: Submit your evidence and pay the arbitration fee before the deadline.</p>`,
   },
   dispute_verdict_ready: {
-    subject: (p) => `AI verdict ready: ${p.contractTitle}`,
+    subject: (p) => `Dispute verdict ready: ${p.contractTitle}`,
     body: (p) =>
-      `<p>The AI agent has analyzed the dispute on <strong>${p.contractTitle}</strong> and issued a verdict.</p>
-       ${p.score !== undefined ? `<p>AI confidence score: <strong>${p.score}/100</strong></p>` : ""}
-       <p style="margin-top:12px;padding:12px;background:#fff3e0;border-radius:6px;">Action required: Review the verdict and choose to <strong>accept</strong> or <strong>reject</strong> it. If both parties accept, the AI ruling is enforced. If either rejects, the dispute escalates to Kleros Court.</p>`,
+      `<p>The dispute on <strong>${p.contractTitle}</strong> has reached a verdict.</p>
+       ${p.score !== undefined ? `<p>Confidence score: <strong>${p.score}/100</strong></p>` : ""}
+       <p style="margin-top:12px;padding:12px;background:#fff3e0;border-radius:6px;">View the dispute details for the full ruling.</p>`,
   },
   dispute_resolved: {
     subject: (p) => `Dispute resolved: ${p.contractTitle}`,
@@ -139,9 +139,9 @@ const NOTIFICATION_CONFIG: Record<
        <p style="margin-top:12px;padding:12px;background:#e8f5e9;border-radius:6px;">The contract status has been updated accordingly. View the contract for details.</p>`,
   },
   dispute_escalated: {
-    subject: (p) => `Dispute escalated to Kleros Court: ${p.contractTitle}`,
+    subject: (p) => `Dispute escalated: ${p.contractTitle}`,
     body: (p) =>
-      `<p>The AI verdict on <strong>${p.contractTitle}</strong> was rejected by at least one party. The dispute has been escalated to <strong>Kleros Court</strong>.</p>
+      `<p>The dispute on <strong>${p.contractTitle}</strong> has been escalated to arbitration review.</p>
        ${p.amount ? `<p>Arbitration fee: <strong>$${p.amount.toLocaleString()}</strong> per party</p>` : ""}
        ${p.deadline ? `<p>Payment deadline: <strong>${p.deadline.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</strong></p>` : ""}
        <p style="margin-top:12px;padding:12px;background:#fce4ec;border-radius:6px;">Action required: You must pay the arbitration fee before the deadline, or you will lose the dispute by default.</p>`,

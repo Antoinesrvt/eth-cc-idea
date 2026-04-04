@@ -1,9 +1,11 @@
 import { ethers } from "ethers";
 import { getProvider, getDeployerSigner } from "./clients";
+import { CHAIN_CONFIG } from "./config";
 import { SERVICE_CONTRACT_ABI } from "./abis";
 
 /**
- * Deposit native currency into the service contract escrow.
+ * Deposit USDC into the service contract escrow.
+ * Handles ERC20 approval automatically before calling depositEscrow().
  */
 export async function depositEscrow(
   contractAddress: string,
@@ -14,15 +16,49 @@ export async function depositEscrow(
   }
 
   const signer = getDeployerSigner();
+  const signerAddress = await signer.getAddress();
+
+  // 1. Check deployer USDC balance
+  const paymentTokenAddress = CHAIN_CONFIG.paymentTokenAddress;
+  if (!paymentTokenAddress) {
+    throw new Error("PAYMENT_TOKEN_ADDRESS not configured");
+  }
+
+  const erc20Abi = [
+    "function balanceOf(address) view returns (uint256)",
+    "function allowance(address,address) view returns (uint256)",
+    "function approve(address,uint256) returns (bool)",
+    "function decimals() view returns (uint8)",
+  ];
+  const paymentToken = new ethers.Contract(paymentTokenAddress, erc20Abi, signer);
+
+  const balance: bigint = await paymentToken.balanceOf(signerAddress);
+  if (balance < amount) {
+    const decimals: number = await paymentToken.decimals().then(Number);
+    const needed = ethers.formatUnits(amount, decimals);
+    const has = ethers.formatUnits(balance, decimals);
+    throw new Error(`Insufficient USDC balance: need ${needed}, have ${has}`);
+  }
+
+  // 2. Approve ServiceContract to spend USDC if needed
+  const allowance: bigint = await paymentToken.allowance(signerAddress, contractAddress);
+  if (allowance < amount) {
+    console.log("[depositEscrow] Approving USDC spend...");
+    const approveTx = await paymentToken.approve(contractAddress, ethers.MaxUint256);
+    await approveTx.wait(1);
+    console.log("[depositEscrow] USDC approved");
+  }
+
+  // 3. Call depositEscrow() — transfers full totalValue from signer to contract
+  //    Fetch nonce explicitly to avoid stale cache after the approve tx above.
   const contract = new ethers.Contract(
     contractAddress,
     SERVICE_CONTRACT_ABI,
     signer,
   );
 
-  // depositEscrow() uses ERC20 transferFrom — no value needed
-  // The deployer must have approved the ServiceContract to spend tUSD first
-  const tx = await contract.depositEscrow();
+  const nonce = await signer.getNonce();
+  const tx = await contract.depositEscrow({ gasLimit: 300_000, nonce });
   const receipt = await tx.wait(1);
   return receipt.hash;
 }

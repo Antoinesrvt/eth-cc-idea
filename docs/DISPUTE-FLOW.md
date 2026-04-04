@@ -16,59 +16,46 @@ Client reviews:
 
 Agency sees rejection:
   → Accept rejection → milestone stays rejected, agency can rework
-  → Start dispute → enters 2-phase dispute resolution
+  → Start dispute → enters dispute resolution
 ```
 
-## Phase 1: AI Review
+## Dispute Flow (Current Implementation)
+
+### Phase 1: Evidence Collection
 
 ```
-Either party starts dispute
-  → AI analyzes:
-    - Contract specification
-    - Deliverable proof
-    - Client's argument
-    - Agency's argument
-  → AI gives verdict:
-    - Score (0-100)
-    - Approved or Rejected
-    - Detailed reasoning
-    - Met/unmet requirements list
-
-Both parties see the AI verdict
-  → ACCEPT or REJECT buttons for each party
-
-If both accept:
-  → AI ruling enforced
-  → Milestone approved or rejected based on AI verdict
-  → Dispute resolved
-
-If either rejects:
-  → Escalate to Phase 2 (Kleros Court)
+Either party starts dispute (POST /api/contracts/[id]/dispute)
+  → Dispute created in DB (phase: "evidence")
+  → Both parties can submit evidence (text, links, file attachments)
+  → Email notifications sent to both parties
 ```
 
-## Phase 2: Decentralized Court (Kleros)
+### Phase 2: Arbitration Fee Payment
 
 ```
 Both parties must pay arbitration fee
-  → ~0.05-0.1 ETH per party
-  → 1 month deadline to pay
+  → 1-month deadline to pay
+  → Fee amount set at dispute creation
 
 If one party doesn't pay within deadline:
   → They LOSE by default
-  → Other party gets their fee refunded
-  → Ruling enforced in favor of the party who paid
+  → Ruling enforced: on-chain refund via refundMilestone()
+  → Email notification of default ruling
 
 If both parties pay:
-  → Dispute submitted to Kleros Court on Arbitrum
-  → AI verdict + all evidence submitted to jurors
-  → 3-7 random jurors review the case
-  → 3-5 day deliberation period
-  → Ruling: client wins OR agency wins
-
-Winner:
-  → Gets their arbitration fee refunded (from loser's deposit)
-  → Milestone enforced per ruling (approved or rejected + refund)
+  → Phase transitions to "kleros_review" in DB
+  → ⚠ NOT YET WIRED to actual Kleros court
 ```
+
+### Phase 3: Review (NOT YET IMPLEMENTED)
+
+Kleros court integration requires Arbitrum (Kleros v2 is native there). On Base Sepolia, disputes that reach this phase are marked in DB but not submitted to any external arbitration system.
+
+**Future implementation would:**
+1. Submit dispute to Kleros Core on Arbitrum
+2. Submit all evidence via ERC-1497
+3. Wait for juror ruling
+4. Enforce ruling on-chain
 
 ## API Endpoints
 
@@ -77,9 +64,8 @@ All dispute actions go through a single endpoint:
 
 | Action | Input | Phase |
 |---|---|---|
-| `create` | `{ milestoneId, argument }` | Creates dispute, runs AI |
-| `respond` | `{ disputeId, accepted, argument? }` | Both parties respond to AI |
-| `pay_fee` | `{ disputeId }` | Pay Kleros arbitration fee |
+| `create` | `{ milestoneId, argument }` | Creates dispute |
+| `pay_fee` | `{ disputeId }` | Pay arbitration fee |
 | `check_deadline` | `{ disputeId }` | Check if deadline expired |
 | `submit_evidence` | `{ disputeId, evidenceUri, description }` | Add evidence |
 
@@ -88,9 +74,8 @@ All dispute actions go through a single endpoint:
 ## Phase Transitions
 
 ```
-ai_review       → (AI completes analysis)
-ai_verdict      → (both accept: resolved) OR (either rejects: kleros_payment)
+evidence        → (both submit, move to fee payment)
 kleros_payment  → (both pay: kleros_review) OR (deadline expires: resolved)
-kleros_review   → (jurors rule: resolved)
+kleros_review   → (future: jurors rule → resolved)
 resolved        → final state
 ```
