@@ -544,99 +544,78 @@ export default function DashboardPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/*  As Agency                                                       */}
+      {/*  Role sections — ordered by which has data                       */}
       {/* ---------------------------------------------------------------- */}
-      <div className="mb-8">
-        <SectionHeading
-          icon={<Briefcase className="h-4 w-4" />}
-          label="As Agency"
-          count={agencyContracts.length}
-        />
-        <SectionCard
-          action={
-            <Link
-              href="/contracts/new"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent/80 transition-colors"
-            >
-              <PlusCircle className="h-3.5 w-3.5" /> New Contract
-            </Link>
-          }
-        >
-          {agencyContracts.length > 0 ? (
-            <div className="divide-y divide-border/50 -mx-6 -mb-4">
-              {agencyContracts.map((c) => (
-                <ContractRow
-                  key={c.id}
-                  id={c.id}
-                  title={c.title}
-                  counterpartyLabel="Client"
-                  counterparty={null}
-                  progress={computeProgress(c)}
-                  status={c.status}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Briefcase className="h-10 w-10" />}
-              title="No agency contracts yet"
-              description="Create your first contract to start earning."
-              action={
-                <Link
-                  href="/contracts/new"
-                  className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md bg-accent text-accent-foreground text-sm font-medium active:scale-[0.98] transition-all"
-                >
-                  <PlusCircle className="h-4 w-4" /> Create Contract
-                </Link>
-              }
-            />
-          )}
-        </SectionCard>
-      </div>
+      {(() => {
+        // Build sections with data counts, render non-empty first
+        const sections = [
+          {
+            key: "agency",
+            icon: <Briefcase className="h-4 w-4" />,
+            label: "As Agency",
+            count: agencyContracts.length,
+            content: (
+              <SectionCard
+                action={
+                  <Link href="/contracts/new" className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent/80 transition-colors">
+                    <PlusCircle className="h-3.5 w-3.5" /> New Contract
+                  </Link>
+                }
+              >
+                {agencyContracts.length > 0 ? (
+                  <div className="divide-y divide-border/50 -mx-6 -mb-4">
+                    {agencyContracts.map((c) => (
+                      <ContractRow key={c.id} id={c.id} title={c.title} counterpartyLabel="Client" counterparty={c.client ? truncateAddress(c.client) : "Pending invite"} progress={computeProgress(c)} status={c.status} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={<Briefcase className="h-10 w-10" />} title="No agency contracts" description="Create your first contract to start earning."
+                    action={<Link href="/contracts/new" className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md bg-accent text-accent-foreground text-sm font-medium"><PlusCircle className="h-4 w-4" /> Create Contract</Link>}
+                  />
+                )}
+              </SectionCard>
+            ),
+          },
+          {
+            key: "client",
+            icon: <Users className="h-4 w-4" />,
+            label: "As Client",
+            count: clientContracts.length,
+            content: (
+              <SectionCard>
+                {clientContracts.length > 0 ? (
+                  <div className="divide-y divide-border/50 -mx-6 -mb-4">
+                    {clientContracts.map((c) => (
+                      <ContractRow key={c.id} id={c.id} title={c.title} counterpartyLabel="Agency" counterparty={c.agency ? truncateAddress(c.agency) : null} progress={computeProgress(c)} status={c.status} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={<Users className="h-10 w-10" />} title="No client contracts" description="Accept an invitation to get started."
+                    action={<Link href="/marketplace" className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md border border-border text-sm font-medium hover:bg-surface-secondary"><Store className="h-4 w-4" /> Browse Marketplace</Link>}
+                  />
+                )}
+              </SectionCard>
+            ),
+          },
+          {
+            key: "investor",
+            icon: <TrendingUp className="h-4 w-4" />,
+            label: "Investments",
+            count: investments.length,
+            content: null, // rendered separately below
+          },
+        ];
 
-      {/* ---------------------------------------------------------------- */}
-      {/*  As Client                                                       */}
-      {/* ---------------------------------------------------------------- */}
-      <div className="mb-8">
-        <SectionHeading
-          icon={<Users className="h-4 w-4" />}
-          label="As Client"
-          count={clientContracts.length}
-        />
-        <SectionCard>
-          {clientContracts.length > 0 ? (
-            <div className="divide-y divide-border/50 -mx-6 -mb-4">
-              {clientContracts.map((c) => (
-                <ContractRow
-                  key={c.id}
-                  id={c.id}
-                  title={c.title}
-                  counterpartyLabel="Agency"
-                  counterparty={
-                    c.agency ? truncateAddress(c.agency) : null
-                  }
-                  progress={computeProgress(c)}
-                  status={c.status}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Users className="h-10 w-10" />}
-              title="No client contracts yet"
-              description="No contracts yet. Hire an agency or accept an invitation."
-              action={
-                <Link
-                  href="/marketplace"
-                  className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md border border-border text-sm font-medium hover:bg-surface-secondary transition-all"
-                >
-                  <Store className="h-4 w-4" /> Browse Marketplace
-                </Link>
-              }
-            />
-          )}
-        </SectionCard>
-      </div>
+        // Sort: sections with data first, empty sections last
+        const sorted = [...sections].sort((a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0));
+
+        return sorted.filter(s => s.key !== "investor").map((s) => (
+          <div key={s.key} className="mb-8">
+            <SectionHeading icon={s.icon} label={s.label} count={s.count} />
+            {s.content}
+          </div>
+        ));
+      })()}
 
       {/* ---------------------------------------------------------------- */}
       {/*  Investments                                                     */}
