@@ -96,8 +96,15 @@ export async function POST(
       );
     }
 
-    // Set the counterparty address and advance status
     const normalizedWallet = walletAddress.toLowerCase();
+
+    // Prevent the agency from accepting their own invite
+    if (normalizedWallet === contract.agency?.toLowerCase()) {
+      return Response.json(
+        { error: "You created this contract. Share the invite link with your client instead." },
+        { status: 400 },
+      );
+    }
 
     if (contract.inviteRole === "client") {
       await db.contracts.update(contract.id, {
