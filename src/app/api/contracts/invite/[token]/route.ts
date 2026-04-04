@@ -164,6 +164,10 @@ export async function POST(
       } catch (chainErr) {
         const msg = chainErr instanceof Error ? chainErr.message : String(chainErr);
         console.error("[invite/POST] Factory deploy FAILED:", msg);
+        return Response.json(
+          { error: `Invite accepted but on-chain deployment failed: ${msg}` },
+          { status: 500 },
+        );
       }
     }
 

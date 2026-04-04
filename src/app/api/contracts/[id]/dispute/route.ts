@@ -265,7 +265,12 @@ async function handleCheckDeadline(
         const txHash = await refundMilestone(freshContract.onChainAddress, dispute.milestoneId);
         console.log("[dispute/deadline] On-chain refundMilestone success:", txHash);
       } catch (err) {
-        console.warn("[dispute/deadline] On-chain refundMilestone failed:", err);
+        const msg = err instanceof Error ? err.message : "On-chain refund failed";
+        console.error("[dispute/deadline] On-chain refundMilestone FAILED:", msg);
+        return Response.json(
+          { error: `Dispute resolved but on-chain refund failed: ${msg}` },
+          { status: 500 },
+        );
       }
     }
 

@@ -25,22 +25,27 @@ export async function POST(
     if (contract.status !== "failed" && contract.status !== "disputed") {
       // If contract is active/completed, mark it as failed first
       if (contract.status === "active" || contract.status === "pending_deposit") {
+        // Chain-first: mark failed on-chain before DB
+        if (isBlockchainConfigured() && contract.onChainAddress) {
+          try {
+            const txHash = await markContractFailed(contract.onChainAddress);
+            console.log("[refund] On-chain markContractFailed success:", txHash);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "On-chain markFailed failed";
+            console.error("[refund] On-chain markContractFailed FAILED:", msg);
+            return Response.json(
+              { error: `On-chain mark-failed failed: ${msg}` },
+              { status: 500 },
+            );
+          }
+        }
+
         await db.contracts.update(id, { status: "failed" });
 
         // Mark non-approved milestones as failed
         for (const m of contract.milestones) {
           if (m.status !== "approved") {
             await db.contracts.updateMilestone(id, m.id, { status: "failed" });
-          }
-        }
-
-        // On-chain: mark failed
-        if (isBlockchainConfigured() && contract.onChainAddress) {
-          try {
-            const txHash = await markContractFailed(contract.onChainAddress);
-            console.log("[refund] On-chain markContractFailed success:", txHash);
-          } catch (err) {
-            console.warn("[refund] On-chain markContractFailed failed:", err);
           }
         }
       } else {
@@ -51,18 +56,23 @@ export async function POST(
       }
     }
 
-    // Execute refund
-    await db.escrows.refund(id);
-
-    // On-chain: refund escrow
+    // Chain-first: refund escrow on-chain before DB
     if (isBlockchainConfigured() && contract.onChainAddress) {
       try {
         const txHash = await refundEscrowOnChain(contract.onChainAddress);
         console.log("[refund] On-chain refundEscrow success:", txHash);
       } catch (err) {
-        console.warn("[refund] On-chain refundEscrow failed:", err);
+        const msg = err instanceof Error ? err.message : "On-chain refund failed";
+        console.error("[refund] On-chain refundEscrow FAILED:", msg);
+        return Response.json(
+          { error: `On-chain refund failed: ${msg}` },
+          { status: 500 },
+        );
       }
     }
+
+    // Execute refund in DB only after chain succeeds
+    await db.escrows.refund(id);
 
     const updated = await db.contracts.findById(id);
     const escrow = await db.escrows.findByContract(id);

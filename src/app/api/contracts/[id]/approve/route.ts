@@ -78,6 +78,21 @@ export async function POST(
       contract.bdFeePercent,
     );
 
+    // Chain-first: if on-chain, approval must succeed on-chain before DB update
+    if (isBlockchainConfigured() && contract.onChainAddress) {
+      try {
+        const txHash = await approveMilestone(contract.onChainAddress, parsed.data.milestoneId);
+        console.log("[approve] On-chain success:", txHash);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "On-chain approval failed";
+        console.error("[approve] On-chain FAILED:", msg);
+        return Response.json(
+          { error: `On-chain approval failed: ${msg}` },
+          { status: 500 },
+        );
+      }
+    }
+
     const updatedContract = await db.contracts.updateMilestone(
       id,
       parsed.data.milestoneId,
@@ -109,8 +124,11 @@ export async function POST(
           );
         }
       } catch (unlinkError) {
-        // Unlink failure must not block the DB operation — log and continue
         console.error("[Unlink] privateTransfer failed:", unlinkError);
+        return Response.json(
+          { error: `Private transfer failed: ${unlinkError instanceof Error ? unlinkError.message : "Unknown error"}` },
+          { status: 500 },
+        );
       }
     }
 
@@ -119,19 +137,6 @@ export async function POST(
     );
     if (allApproved) {
       await db.contracts.update(id, { status: "completed" });
-    }
-
-    // Chain-first: if on-chain, approval must succeed on-chain (fee split happens there)
-    if (isBlockchainConfigured() && contract.onChainAddress) {
-      try {
-        const txHash = await approveMilestone(contract.onChainAddress, parsed.data.milestoneId);
-        console.log("[approve] On-chain success:", txHash);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "On-chain approval failed";
-        console.error("[approve] On-chain FAILED:", msg);
-        // Note: DB was already updated. In production, we'd roll back.
-        // For hackathon: log the error, DB state is ahead of chain.
-      }
     }
 
     // Notify agency that milestone was approved

@@ -97,21 +97,26 @@ export async function POST(
       return Response.json({ error: "Contract not found" }, { status: 404 });
     }
 
-    const updated = await db.contracts.updateMilestone(id, milestoneId, {
-      status: "delivered",
-      proofHash,
-      deliveredAt: new Date(),
-    });
-
-    // Attempt real on-chain deliverable submission if blockchain is configured
+    // Chain-first: submit on-chain before updating DB
     if (isBlockchainConfigured() && contract.onChainAddress) {
       try {
         const txHash = await submitDeliverable(contract.onChainAddress, milestoneId, proofHash);
         console.log("[deliver] On-chain submitDeliverable success:", txHash);
       } catch (err) {
-        console.warn("[deliver] On-chain submitDeliverable failed:", err);
+        const msg = err instanceof Error ? err.message : "On-chain delivery submission failed";
+        console.error("[deliver] On-chain submitDeliverable FAILED:", msg);
+        return Response.json(
+          { error: `On-chain delivery failed: ${msg}` },
+          { status: 500 },
+        );
       }
     }
+
+    const updated = await db.contracts.updateMilestone(id, milestoneId, {
+      status: "delivered",
+      proofHash,
+      deliveredAt: new Date(),
+    });
 
     // Validate and extract text from uploaded files
     const fileContents: { filename: string; mimeType: string; text: string }[] = [];

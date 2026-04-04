@@ -51,13 +51,7 @@ export async function POST(
       );
     }
 
-    const updatedContract = await db.contracts.updateMilestone(
-      id,
-      parsed.data.milestoneId,
-      { status: "rejected" },
-    );
-
-    // Attempt on-chain rejection if blockchain is configured
+    // Chain-first: reject on-chain before updating DB
     if (isBlockchainConfigured() && contract.onChainAddress) {
       try {
         const txHash = await rejectMilestone(
@@ -67,9 +61,20 @@ export async function POST(
         );
         console.log("[reject] On-chain rejectMilestone success:", txHash);
       } catch (err) {
-        console.warn("[reject] On-chain rejectMilestone failed:", err);
+        const msg = err instanceof Error ? err.message : "On-chain rejection failed";
+        console.error("[reject] On-chain rejectMilestone FAILED:", msg);
+        return Response.json(
+          { error: `On-chain rejection failed: ${msg}` },
+          { status: 500 },
+        );
       }
     }
+
+    const updatedContract = await db.contracts.updateMilestone(
+      id,
+      parsed.data.milestoneId,
+      { status: "rejected" },
+    );
 
     // Notify agency that milestone was rejected
     if (contract.agency) {

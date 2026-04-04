@@ -63,7 +63,7 @@ export async function POST(
 
     let txHash: string | undefined;
 
-    // Attempt real on-chain Uniswap swap if blockchain is configured
+    // Chain-first: execute Uniswap swap — must succeed or request fails
     if (isBlockchainConfigured() && CHAIN_CONFIG.paymentTokenAddress) {
       try {
         const signer = getDeployerSigner();
@@ -77,7 +77,12 @@ export async function POST(
         });
         console.log("[marketplace/buy] On-chain swap success:", txHash);
       } catch (err) {
-        console.warn("[marketplace/buy] On-chain swap failed:", err);
+        const msg = err instanceof Error ? err.message : "On-chain swap failed";
+        console.error("[marketplace/buy] On-chain swap FAILED:", msg);
+        return Response.json(
+          { error: `Token purchase failed on-chain: ${msg}` },
+          { status: 500 },
+        );
       }
     }
 

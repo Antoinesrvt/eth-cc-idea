@@ -119,41 +119,37 @@ export async function POST(
 
         if (tokenAddress) {
           // 2. Create Uniswap V3 pool (ContractToken / USDC)
-          try {
-            poolAddress = await createPool({
+          poolAddress = await createPool({
+            tokenAddress,
+            usdcAddress: CHAIN_CONFIG.paymentTokenAddress,
+            initialPrice: pricePerToken, // USDC per token
+            signer,
+          });
+          console.log(`[tokenize] Uniswap pool created: ${poolAddress}`);
+
+          // 3. Add initial liquidity
+          if (poolAddress && poolAddress !== ethers.ZeroAddress) {
+            const tokenAmount = ethers.parseUnits(totalSupply.toString(), 18);
+            // USDC = totalSupply * pricePerToken (6 decimals)
+            const usdcAmount = BigInt(Math.round(totalSupply * pricePerToken * 1e6));
+
+            await addLiquidity({
               tokenAddress,
               usdcAddress: CHAIN_CONFIG.paymentTokenAddress,
-              initialPrice: pricePerToken, // USDC per token
+              tokenAmount,
+              usdcAmount,
               signer,
             });
-            console.log(`[tokenize] Uniswap pool created: ${poolAddress}`);
-          } catch (poolErr) {
-            console.warn("[tokenize] Pool creation failed (best-effort):", poolErr instanceof Error ? poolErr.message : poolErr);
-          }
-
-          // 3. Add initial liquidity if pool was created
-          if (poolAddress && poolAddress !== ethers.ZeroAddress) {
-            try {
-              // Provide liquidity: all minted tokens + equivalent USDC
-              const tokenAmount = ethers.parseUnits(totalSupply.toString(), 18);
-              // USDC = totalSupply * pricePerToken (6 decimals)
-              const usdcAmount = BigInt(Math.round(totalSupply * pricePerToken * 1e6));
-
-              await addLiquidity({
-                tokenAddress,
-                usdcAddress: CHAIN_CONFIG.paymentTokenAddress,
-                tokenAmount,
-                usdcAmount,
-                signer,
-              });
-              console.log(`[tokenize] Initial liquidity added to pool`);
-            } catch (liqErr) {
-              console.warn("[tokenize] Add liquidity failed (best-effort):", liqErr instanceof Error ? liqErr.message : liqErr);
-            }
+            console.log(`[tokenize] Initial liquidity added to pool`);
           }
         }
       } catch (chainErr) {
-        console.warn("[tokenize] On-chain deployment failed (continuing DB-only):", chainErr);
+        const msg = chainErr instanceof Error ? chainErr.message : String(chainErr);
+        console.error("[tokenize] On-chain failed:", msg);
+        return Response.json(
+          { error: `Tokenization failed on-chain: ${msg}` },
+          { status: 500 },
+        );
       }
     }
 
