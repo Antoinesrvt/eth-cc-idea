@@ -53,13 +53,19 @@ function useLocalAuth() {
   }, []);
 
   const login = useCallback(async () => {
-    const eth = (window as unknown as { ethereum?: { request: (args: { method: string }) => Promise<string[]> } }).ethereum;
+    const eth = (window as unknown as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
     if (!eth) {
       alert("Install MetaMask or Rabby to connect locally");
       return;
     }
     try {
-      const accounts = await eth.request({ method: "eth_requestAccounts" });
+      // Force the wallet picker / account selector popup
+      await eth.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+      // After permission granted, get the selected account
+      const accounts = await eth.request({ method: "eth_accounts" }) as string[];
       if (accounts[0]) {
         setAddress(accounts[0]);
         setGlobalAuth(accounts[0]);
