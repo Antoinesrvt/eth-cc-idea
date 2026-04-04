@@ -50,6 +50,7 @@ export const CHAIN_CONFIG = {
   platformTreasury: process.env.PLATFORM_TREASURY || "",
 
   // Contracts
+  factoryAddress: process.env.CONTRACT_FACTORY_ADDRESS || "",
   serviceContractAddress: process.env.SERVICE_CONTRACT_ADDRESS || "",
   paymentTokenAddress: process.env.PAYMENT_TOKEN_ADDRESS || "",
 

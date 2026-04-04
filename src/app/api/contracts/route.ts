@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db, ensureInit } from "@/lib/db";
 import { getAuthUser, requireAuth } from "@/lib/auth";
 import { sendContractInvite } from "@/lib/email";
-import { isBlockchainConfigured } from "@/lib/blockchain";
+import { isBlockchainConfigured, createDeal, isFactoryConfigured } from "@/lib/blockchain";
 import type { ContractStatus } from "@/lib/types";
 
 const CreateContractSchema = z.object({
@@ -119,9 +119,33 @@ export async function POST(request: NextRequest) {
       console.log("[contracts/POST] Terms text received (storage skipped):", parsed.data.termsText.slice(0, 80));
     }
 
-    // On-chain factory deployment not yet available — DB-only contract creation
-    if (isBlockchainConfigured() && client) {
-      console.log("[contracts/POST] On-chain factory deployment not available — DB-only contract created for:", contract.id);
+    // Deploy on-chain via factory if configured AND client is known
+    if (isFactoryConfigured() && client) {
+      try {
+        const result = await createDeal({
+          client: contract.client,
+          agency: contract.agency,
+          bd: contract.bd,
+          bdFeeBps: Math.round((contract.bdFeePercent ?? 0) * 100),
+          termsHash: contract.termsHash || `terms_${contract.id}`,
+          milestones: contract.milestones.map((m) => ({
+            name: m.name,
+            amount: BigInt(Math.round(m.amount * 1e18)),
+            deadline: m.deadline ? Math.floor(m.deadline.getTime() / 1000) : 0,
+          })),
+          tokenName: `${contract.title} Token`,
+          tokenSymbol: (contract.title.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 4) || "DEAL") + contract.id.slice(0, 2).toUpperCase(),
+        });
+
+        await db.contracts.update(contract.id, {
+          onChainAddress: result.serviceContractAddress,
+          tokenAddress: result.tokenAddress,
+        });
+
+        console.log("[contracts/POST] On-chain:", result.serviceContractAddress, "token:", result.tokenAddress);
+      } catch (chainErr) {
+        console.error("[contracts/POST] Factory deploy failed (DB-only):", chainErr instanceof Error ? chainErr.message : chainErr);
+      }
     }
 
     // Send invite email
