@@ -18,7 +18,8 @@ export async function GET(
       return Response.json({ error: "Invalid or expired invite link" }, { status: 404 });
     }
 
-    if (contract.status !== "invited") {
+    // Invite is valid as long as the client slot is empty
+    if (contract.client && contract.client !== "") {
       return Response.json(
         { error: "This invite has already been accepted" },
         { status: 400 },
@@ -87,7 +88,8 @@ export async function POST(
       return Response.json({ error: "Invalid or expired invite link" }, { status: 404 });
     }
 
-    if (contract.status !== "invited") {
+    // Invite is valid as long as the client slot is empty
+    if (contract.client && contract.client !== "") {
       return Response.json(
         { error: "This invite has already been accepted" },
         { status: 400 },
