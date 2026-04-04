@@ -2,13 +2,38 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-// Global wallet address — set by useAuth, read by all API calls
-let _globalWallet: string | null = null;
-let _globalToken: string | null = null;
+// Auth is stored in localStorage so it persists across page navigations
+// and is available synchronously (no useEffect timing issues)
+const WALLET_KEY = "trustsignal_wallet";
+const TOKEN_KEY = "trustsignal_token";
 
 export function setGlobalAuth(wallet: string | null, token: string | null = null) {
-  _globalWallet = wallet;
-  _globalToken = token;
+  if (typeof window === "undefined") return;
+  if (wallet) {
+    localStorage.setItem(WALLET_KEY, wallet);
+  } else {
+    localStorage.removeItem(WALLET_KEY);
+  }
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+export function getGlobalWallet(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(WALLET_KEY);
+}
+
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (typeof window === "undefined") return headers;
+  const token = localStorage.getItem(TOKEN_KEY);
+  const wallet = localStorage.getItem(WALLET_KEY);
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (wallet) headers["X-Wallet-Address"] = wallet;
+  return headers;
 }
 
 interface UseApiOptions {
@@ -20,13 +45,6 @@ interface UseApiResult<T> {
   loading: boolean;
   error: string | null;
   refresh: () => void;
-}
-
-function buildHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (_globalToken) headers["Authorization"] = `Bearer ${_globalToken}`;
-  if (_globalWallet) headers["X-Wallet-Address"] = _globalWallet;
-  return headers;
 }
 
 export function useApi<T>(
@@ -76,10 +94,7 @@ export function useApi<T>(
   return { data, loading, error, refresh };
 }
 
-export async function postApi<T>(
-  url: string,
-  body: unknown,
-): Promise<T> {
+export async function postApi<T>(url: string, body: unknown): Promise<T> {
   const isFormData = body instanceof FormData;
   const headers = buildHeaders();
   if (!isFormData) headers["Content-Type"] = "application/json";

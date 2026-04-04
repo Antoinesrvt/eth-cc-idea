@@ -2,7 +2,7 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useCallback, useState, useEffect } from "react";
-import { setGlobalAuth } from "./use-api";
+import { setGlobalAuth, getGlobalWallet } from "./use-api";
 
 const IS_LOCAL = process.env.NEXT_PUBLIC_ENV === "local";
 const PRIVY_CONFIGURED = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID && !IS_LOCAL;
@@ -32,19 +32,30 @@ export function useAuth() {
       const idx = parseInt(choice || "0");
       if (idx >= 0 && idx < ANVIL_ACCOUNTS.length) {
         setAccountIndex(idx);
+        // Set auth SYNCHRONOUSLY before any renders/fetches
+        setGlobalAuth(ANVIL_ACCOUNTS[idx].address);
+      } else {
+        setGlobalAuth(account.address);
       }
       setLoggedIn(true);
     };
 
-    // Sync wallet to global API headers
+    // On mount: restore from localStorage if previously logged in
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => {
-      setGlobalAuth(loggedIn ? account.address : null);
-    }, [loggedIn, account.address]);
+      const saved = getGlobalWallet();
+      if (saved) {
+        const idx = ANVIL_ACCOUNTS.findIndex(a => a.address.toLowerCase() === saved.toLowerCase());
+        if (idx >= 0) {
+          setAccountIndex(idx);
+          setLoggedIn(true);
+        }
+      }
+    }, []);
 
     return {
       login,
-      logout: () => { setLoggedIn(false); setGlobalAuth(null); },
+      logout: () => { setLoggedIn(false); setGlobalAuth(null); window.location.reload(); },
       authenticated: loggedIn,
       user: null,
       ready: true,
