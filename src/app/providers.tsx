@@ -5,16 +5,21 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { Toaster } from "sonner";
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-// Define chain inline to avoid viem/chains import pulling process polyfill
-const baseSepolia = {
-  id: 84532,
-  name: "Base Sepolia",
+// Chain config — reads from env, defaults to Base Sepolia
+// For local dev with Anvil: set NEXT_PUBLIC_CHAIN_ID=31337 and NEXT_PUBLIC_RPC_URL=http://localhost:8545
+const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "84532");
+const appChain = {
+  id: chainId,
+  name: chainId === 31337 ? "Anvil (Local)" : "Base Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://sepolia.base.org"] },
+    default: { http: [process.env.NEXT_PUBLIC_RPC_URL || "https://sepolia.base.org"] },
   },
   blockExplorers: {
-    default: { name: "BaseScan", url: "https://sepolia.basescan.org" },
+    default: {
+      name: chainId === 31337 ? "Local" : "BaseScan",
+      url: chainId === 31337 ? "http://localhost:8545" : "https://sepolia.basescan.org",
+    },
   },
   testnet: true,
 } as const;
@@ -55,8 +60,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           primary: ["google", "telegram", "detected_ethereum_wallets"],
           overflow: ["email"],
         },
-        defaultChain: baseSepolia,
-        supportedChains: [baseSepolia],
+        defaultChain: appChain,
+        supportedChains: [appChain],
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
         },
