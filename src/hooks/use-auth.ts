@@ -59,12 +59,22 @@ function useLocalAuth() {
       return;
     }
     try {
-      // Force the wallet picker / account selector popup
+      // Revoke existing permissions first to force the picker
+      try {
+        await eth.request({
+          method: "wallet_revokePermissions",
+          params: [{ eth_accounts: {} }],
+        });
+      } catch {
+        // Not all wallets support revokePermissions — that's fine
+      }
+
+      // Now request fresh permissions — this should show the picker
       await eth.request({
         method: "wallet_requestPermissions",
         params: [{ eth_accounts: {} }],
       });
-      // After permission granted, get the selected account
+
       const accounts = await eth.request({ method: "eth_accounts" }) as string[];
       if (accounts[0]) {
         setAddress(accounts[0]);
