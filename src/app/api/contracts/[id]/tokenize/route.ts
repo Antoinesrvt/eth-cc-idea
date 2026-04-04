@@ -5,18 +5,11 @@ import { db, ensureInit } from "@/lib/db";
 import { isBlockchainConfigured } from "@/lib/blockchain";
 import { CHAIN_CONFIG } from "@/lib/blockchain/config";
 import { getDeployerSigner } from "@/lib/blockchain/clients";
+import { SERVICE_CONTRACT_ABI } from "@/lib/blockchain/abis";
 import { createPool, addLiquidity } from "@/lib/uniswap";
 import { requireAuth } from "@/lib/auth";
 import type { TokenizationExposure } from "@/lib/types/contract";
 import { DEFAULT_EXPOSURE } from "@/lib/types/contract";
-
-// Minimal ERC20 ABI for ContractToken deployment
-const CONTRACT_TOKEN_ABI = [
-  "constructor(string memory _name, string memory _symbol, address _owner)",
-  "function mint(address to, uint256 amount) external",
-  "function approve(address spender, uint256 amount) external returns (bool)",
-  "function balanceOf(address owner) external view returns (uint256)",
-];
 
 const TokenizeBodySchema = z.object({
   tokenName: z.string().min(1).max(64),
@@ -108,13 +101,19 @@ export async function POST(
           );
         }
 
-        // Token exists from factory — mint the supply to the agency
+        // Mint tokens via ServiceContract.mintTokens() (it owns the ContractToken)
+        if (!contract.onChainAddress) {
+          return Response.json(
+            { error: "Contract not deployed on-chain yet." },
+            { status: 400 },
+          );
+        }
         {
-          const tokenContract = new ethers.Contract(tokenAddress, CONTRACT_TOKEN_ABI, signer);
+          const sc = new ethers.Contract(contract.onChainAddress, SERVICE_CONTRACT_ABI, signer);
           const mintAmount = ethers.parseUnits(totalSupply.toString(), 18);
-          const tx = await tokenContract.mint(agencyAddress, mintAmount, { gasLimit: 200_000 });
+          const tx = await sc.mintTokens(agencyAddress, mintAmount, { gasLimit: 300_000 });
           await tx.wait(1);
-          console.log(`[tokenize] Minted ${totalSupply} tokens on existing token: ${tokenAddress}`);
+          console.log(`[tokenize] Minted ${totalSupply} tokens via ServiceContract → ContractToken: ${tokenAddress}`);
         }
 
         if (tokenAddress) {

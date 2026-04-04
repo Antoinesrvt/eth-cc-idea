@@ -266,6 +266,19 @@ export const SERVICE_CONTRACT_ABI = [
   },
   {
     "type": "function",
+    "name": "getTokenAddress",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "markFailed",
     "inputs": [],
     "outputs": [],
@@ -283,6 +296,24 @@ export const SERVICE_CONTRACT_ABI = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "mintTokens",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -350,6 +381,19 @@ export const SERVICE_CONTRACT_ABI = [
   },
   {
     "type": "function",
+    "name": "setTokenAddress",
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "submitDeliverable",
     "inputs": [
       {
@@ -365,6 +409,19 @@ export const SERVICE_CONTRACT_ABI = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "tokenAddress",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",

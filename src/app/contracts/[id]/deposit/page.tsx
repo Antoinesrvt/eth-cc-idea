@@ -57,29 +57,13 @@ export default function DepositPage() {
     setTxStatus("sending");
 
     try {
-      let txHash = `deposit_${Date.now().toString(36)}`;
 
-      // If contract is deployed on-chain, send a real transaction
-      if (contract?.onChainAddress) {
-        const eth = (window as unknown as { ethereum?: unknown }).ethereum;
-        if (!eth) throw new Error("No wallet detected. Please install MetaMask or Rabby.");
-
-        const provider = new BrowserProvider(eth as never);
-        const signer = await provider.getSigner();
-
-        // TODO: For ERC20 deposits, this should be approve() + depositEscrow()
-        // For now, just record in DB
-        console.log("[deposit] Would call ServiceContract.depositEscrow() at", contract.onChainAddress);
-      }
-
-      setTxStatus("confirmed");
-
-      await depositEscrow(id, {
+      const result = await depositEscrow(id, {
         amount: remaining,
-        txHash,
         paymentMethod: contract?.onChainAddress ? "crypto" : "db_only",
       });
 
+      setTxStatus("confirmed");
       toast.success("Escrow deposited!");
       setTimeout(() => router.push(`/contracts/${id}`), 1500);
     } catch (err) {
@@ -184,7 +168,7 @@ export default function DepositPage() {
           onPress={handleDeposit}
           isDisabled={depositing || loading || !authenticated}
           fullWidth
-          className="py-4 rounded-xl bg-accent text-foreground font-medium text-lg hover:bg-accent/80 transition-colors"
+          className="py-4 rounded-xl bg-accent text-accent-foreground font-medium text-lg hover:bg-accent/80 transition-colors"
         >
           {depositing ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
           {depositing ? "Processing..." : `Deposit $${remaining.toLocaleString()}`}

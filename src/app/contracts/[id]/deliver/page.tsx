@@ -277,7 +277,7 @@ export default function DeliverPage() {
         onPress={handleSubmit}
         isDisabled={submitting || !activeMilestoneId || !notes.trim()}
         fullWidth
-        className="py-4 rounded-xl bg-accent text-foreground font-medium text-lg hover:bg-accent/80 transition-colors"
+        className="py-4 rounded-xl bg-accent text-accent-foreground font-medium text-lg hover:bg-accent/80 transition-colors"
       >
         {submitting && <Loader2 className="h-5 w-5 animate-spin mr-2" />}
         {submitting ? "Submitting..." : "Submit Deliverable"}

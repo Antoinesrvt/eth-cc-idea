@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ContractToken} from "./ContractToken.sol";
 
 /// @title ServiceContract
 /// @notice Escrow contract for agency-client service agreements.
@@ -79,6 +80,7 @@ contract ServiceContract is ReentrancyGuard {
     Milestone[] private _milestones;
     address public immutable platformTreasury;
     IERC20 public immutable paymentToken;   // tUSD — the ERC20 used for all payments
+    address public tokenAddress;             // ContractToken address (set by factory)
     uint256 private _totalPaid;
 
 
@@ -362,6 +364,30 @@ contract ServiceContract is ReentrancyGuard {
         _contractData.status = ContractStatus.Failed;
 
         emit ContractFailed(refundable);
+    }
+
+    // ── Token Functions ────────────────────────────────────────────────
+
+    /// @notice Sets the token address. Can only be called once (by the factory).
+    function setTokenAddress(address _token) external {
+        require(tokenAddress == address(0), "Token already set");
+        require(_token != address(0), "Invalid token");
+        tokenAddress = _token;
+    }
+
+    /// @notice Returns the token address.
+    function getTokenAddress() external view returns (address) {
+        return tokenAddress;
+    }
+
+    /// @notice Agency mints ContractToken supply for tokenization.
+    ///         Only callable when contract is Active (escrow deposited).
+    /// @param to      Recipient of the minted tokens (typically the agency)
+    /// @param amount  Amount to mint (in wei, 18 decimals)
+    function mintTokens(address to, uint256 amount) external onlyAgencyOrOperator {
+        require(_contractData.status == ContractStatus.Active, "Not active");
+        require(tokenAddress != address(0), "Token not set");
+        ContractToken(tokenAddress).mint(to, amount);
     }
 
     // ── Agency Functions ─────────────────────────────────────────────────

@@ -109,7 +109,7 @@ export function useCreateContract() {
 
 export async function depositEscrow(
   contractId: string,
-  data: { amount: number; txHash: string; paymentMethod?: string },
+  data: { amount: number; txHash?: string; paymentMethod?: string },
 ) {
   return postApi<EscrowState>(`/api/contracts/${contractId}/deposit`, data);
 }

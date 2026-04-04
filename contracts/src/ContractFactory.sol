@@ -61,6 +61,9 @@ contract ContractFactory {
         // Deploy ContractToken owned by the ServiceContract
         token = address(new ContractToken(tokenName, tokenSymbol, serviceContract));
 
+        // Link token to service contract so it can call mint
+        ServiceContract(serviceContract).setTokenAddress(token);
+
         // Record
         uint256 dealId = deals.length;
         deals.push(DealRecord({

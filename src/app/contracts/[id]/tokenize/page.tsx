@@ -155,7 +155,7 @@ export default function TokenizePage() {
             </div>
           </SectionCard>
 
-          <Button onPress={() => setStep("confirm")} fullWidth className="py-4 rounded-xl bg-accent text-foreground font-medium text-lg">
+          <Button onPress={() => setStep("confirm")} fullWidth className="py-4 rounded-xl bg-accent text-accent-foreground font-medium text-lg">
             Review & Tokenize
           </Button>
         </>
@@ -193,7 +193,7 @@ export default function TokenizePage() {
 
           <div className="flex gap-3">
             <Button onPress={() => setStep("form")} variant="ghost" className="flex-1 py-3 rounded-xl border border-border">Cancel</Button>
-            <Button onPress={handleConfirm} className="flex-1 py-3 rounded-xl bg-accent text-foreground font-medium">Confirm & Tokenize</Button>
+            <Button onPress={handleConfirm} className="flex-1 py-3 rounded-xl bg-accent text-accent-foreground font-medium">Confirm & Tokenize</Button>
           </div>
         </>
       )}
