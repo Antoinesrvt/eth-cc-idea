@@ -358,8 +358,33 @@ export default function ContractDetailPage() {
           contract.status === "invited" ? "bg-info/10 border border-info/20 text-info" :
           "bg-surface-secondary border border-border text-muted"
         }`}>
-          {contract.status === "invited" && (
-            <><Mail className="h-5 w-5 shrink-0" /><span>Invitation sent to <strong>{contract.inviteEmail}</strong>. Waiting for them to join.</span></>
+          {(contract.status === "draft" || contract.status === "invited") && contract.inviteToken && userRole === "agency" && (
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5 shrink-0" />
+                <span>
+                  {contract.inviteEmail
+                    ? <>Invitation sent to <strong>{contract.inviteEmail}</strong>. Waiting for them to join.</>
+                    : <>Share this link with your client to join the contract.</>
+                  }
+                </span>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-background/50">
+                <code className="text-xs font-mono flex-1 truncate select-all">
+                  {typeof window !== "undefined" ? `${window.location.origin}/contracts/invite/${contract.inviteToken}` : ""}
+                </code>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/contracts/invite/${contract.inviteToken}`;
+                    navigator.clipboard.writeText(url);
+                    toast.success("Invite link copied!");
+                  }}
+                  className="shrink-0 px-2 py-1 rounded text-xs font-medium bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
           )}
           {contract.status === "pending_deposit" && userRole === "client" && (
             <>
