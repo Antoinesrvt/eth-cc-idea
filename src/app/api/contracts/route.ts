@@ -148,7 +148,8 @@ export async function POST(request: NextRequest) {
         const chainErrMsg = chainErr instanceof Error ? chainErr.message : String(chainErr);
         console.error("[contracts/POST] Factory deploy FAILED:", chainErrMsg);
         // Contract created in DB but not on-chain — surface warning
-        (contract as Record<string, unknown>).warnings = [`On-chain deployment failed: ${chainErrMsg.slice(0, 100)}`];
+        // @ts-expect-error — adding runtime-only field for response
+        contract.warnings = [`On-chain deployment failed: ${chainErrMsg.slice(0, 100)}`];
       }
     }
 

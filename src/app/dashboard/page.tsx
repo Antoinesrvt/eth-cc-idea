@@ -505,44 +505,11 @@ export default function DashboardPage() {
       </div>
 
       {/* ---------------------------------------------------------------- */}
-      {/*  Action Required Section                                         */}
+      {/*  Two-column layout: contracts (left) + actions (right)           */}
       {/* ---------------------------------------------------------------- */}
-      {actionItems.length > 0 ? (
-        <div className="mb-8">
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-            Action Required
-          </h2>
-          <div className="space-y-2">
-            {actionItems.map((item) => (
-              <Link key={item.id} href={item.href}>
-                <div
-                  className={`flex items-center gap-4 p-4 rounded-lg border border-border border-l-4 ${actionBorderColor(item.type)} bg-surface hover:bg-surface-secondary transition-colors group`}
-                >
-                  {actionIcon(item.type)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      {item.title}
-                    </p>
-                    <p className="text-xs text-muted">
-                      {item.subtitle}
-                      <span className="ml-2 text-muted/60">({item.role})</span>
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted group-hover:text-accent group-hover:translate-x-1 transition-all shrink-0" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-8 flex items-center gap-3 p-4 rounded-lg border border-border bg-surface">
-          <CheckCircle2 className="h-5 w-5 text-success" />
-          <p className="text-sm text-muted">
-            All caught up! No pending actions.
-          </p>
-        </div>
-      )}
-
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        {/* Left column: Role-based contract sections */}
+        <div>
       {/* ---------------------------------------------------------------- */}
       {/*  Role sections — ordered by which has data                       */}
       {/* ---------------------------------------------------------------- */}
@@ -719,11 +686,41 @@ export default function DashboardPage() {
           )}
         </SectionCard>
       </div>
+        </div>{/* end left column */}
+
+        {/* Right column: Action Required (sticky sidebar) */}
+        <div className="lg:sticky lg:top-20 lg:self-start">
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+            Action Required
+          </h2>
+          {actionItems.length > 0 ? (
+            <div className="space-y-2">
+              {actionItems.map((item) => (
+                <Link key={item.id} href={item.href}>
+                  <div className={`flex items-center gap-3 p-3 rounded-lg border border-border border-l-4 ${actionBorderColor(item.type)} bg-surface hover:bg-surface-secondary transition-colors group`}>
+                    {actionIcon(item.type)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
+                      <p className="text-xs text-muted truncate">{item.subtitle}</p>
+                    </div>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted group-hover:text-accent shrink-0" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-surface">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <p className="text-xs text-muted">All caught up!</p>
+            </div>
+          )}
+        </div>
+      </div>{/* end grid */}
 
       {/* ---------------------------------------------------------------- */}
       {/*  Discover Section                                                */}
       {/* ---------------------------------------------------------------- */}
-      <div>
+      <div className="mt-8">
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
           Discover
         </h2>
